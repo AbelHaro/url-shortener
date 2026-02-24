@@ -1,6 +1,9 @@
 package service
 
 import (
+	"errors"
+	"net/url"
+
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
 	"github.com/AbelHaro/url-shortener/backend/internal/repository"
 	"github.com/AbelHaro/url-shortener/backend/internal/utils"
@@ -18,31 +21,56 @@ func NewURLService(repo repository.URLRepository) *URLService {
 }
 
 func (svc *URLService) Store(originalURL string) (*domain.URL, error) {
-	shortURL, err := utils.GenerateShortURL(originalURL)
+	if err := svc.validateURL(originalURL); err != nil {
+		return nil, err
+	}
 
+	existing, err := svc.repo.FindByOriginalURL(originalURL)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return existing, nil
+	}
+
+	shortURL, err := utils.GenerateShortURL(originalURL)
 	if err != nil {
 		return nil, err
 	}
 
-	url := &domain.URL{
+	urlToInsert := &domain.URL{
 		ID:          uuid.New(),
 		OriginalURL: originalURL,
 		ShortURL:    shortURL,
 	}
-	err = svc.repo.Store(url)
-	if err != nil {
+
+	if err := svc.repo.Store(urlToInsert); err != nil {
 		return nil, err
 	}
 
-	return url, nil
+	return urlToInsert, nil
 }
 
 func (svc *URLService) FindByShortURL(shortURL string) (*domain.URL, error) {
-	return svc.repo.FindByShortURL(shortURL)
+	urlFound, err := svc.repo.FindByShortURL(shortURL)
+	if err != nil {
+		return nil, err
+	}
+	if urlFound == nil {
+		return nil, domain.ErrURLNotFound
+	}
+	return urlFound, nil
 }
 
 func (svc *URLService) FindByID(id string) (*domain.URL, error) {
-	return svc.repo.FindByID(id)
+	urlFound, err := svc.repo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if urlFound != nil {
+		return nil, domain.ErrURLNotFound
+	}
+	return urlFound, nil
 }
 
 func (svc *URLService) FindByOriginalURL(originalURL string) (*domain.URL, error) {
@@ -50,5 +78,18 @@ func (svc *URLService) FindByOriginalURL(originalURL string) (*domain.URL, error
 }
 
 func (svc *URLService) Delete(id string) error {
+	_, err := svc.repo.FindByID(id)
+	if err != nil {
+		return domain.ErrURLNotFound
+	}
+
 	return svc.repo.DeleteByID(id)
+}
+
+func (svc *URLService) validateURL(rawURL string) error {
+	_, err := url.ParseRequestURI(rawURL)
+	if err != nil {
+		return errors.New("invalid url format")
+	}
+	return nil
 }

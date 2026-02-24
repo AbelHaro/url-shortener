@@ -7,5 +7,9 @@ import (
 
 func GenerateShortURL(originalURL string) (string, error) {
 	hash := sha256.Sum256([]byte(originalURL))
-	return base64.URLEncoding.EncodeToString(hash[:]), nil
+	encoded := base64.URLEncoding.EncodeToString(hash[:])
+	if len(encoded) > 10 {
+		encoded = encoded[len(encoded)-10:]
+	}
+	return encoded, nil
 }

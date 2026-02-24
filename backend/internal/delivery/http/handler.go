@@ -1,8 +1,10 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 
+	"github.com/AbelHaro/url-shortener/backend/internal/domain"
 	"github.com/AbelHaro/url-shortener/backend/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -35,13 +37,13 @@ func (h *URLHandler) Create(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	url, err := h.service.Store(req.URL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.handleError(c, err)
 		return
 	}
 
@@ -53,12 +55,7 @@ func (h *URLHandler) Redirect(c *gin.Context) {
 
 	url, err := h.service.FindByShortURL(shortURL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if url == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "url not found"})
+		h.handleError(c, err)
 		return
 	}
 
@@ -70,12 +67,7 @@ func (h *URLHandler) FindByID(c *gin.Context) {
 
 	url, err := h.service.FindByID(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if url == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "url not found"})
+		h.handleError(c, err)
 		return
 	}
 
@@ -87,7 +79,7 @@ func (h *URLHandler) Delete(c *gin.Context) {
 
 	err := h.service.Delete(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.handleError(c, err)
 		return
 	}
 
@@ -100,13 +92,13 @@ func (h *URLHandler) FindByOriginalURL(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	url, err := h.service.FindByOriginalURL(req.URL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.handleError(c, err)
 		return
 	}
 
@@ -120,5 +112,15 @@ func (h *URLHandler) FindByOriginalURL(c *gin.Context) {
 
 func (h *URLHandler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	return
+}
+
+func (h *URLHandler) handleError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, domain.ErrURLNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case errors.Is(err, domain.ErrInvalidURL):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+	}
 }
