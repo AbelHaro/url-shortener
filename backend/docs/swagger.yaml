@@ -1,3 +1,4 @@
+basePath: /api/v1
 definitions:
   domain.URL:
     properties:
@@ -32,8 +33,12 @@ definitions:
     required:
     - url
     type: object
+host: localhost:8080
 info:
   contact: {}
+  description: API for shortening URLs
+  title: URL Shortener API
+  version: "1.0"
 paths:
   /{shortURL}:
     get:
@@ -157,3 +162,8 @@ paths:
       tags:
       - URLs
 swagger: "2.0"
+tags:
+- description: Operations with URLs
+  name: URLs
+- description: Health check
+  name: Health

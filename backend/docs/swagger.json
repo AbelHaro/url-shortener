@@ -1,8 +1,13 @@
 {
     "swagger": "2.0",
     "info": {
-        "contact": {}
+        "description": "API for shortening URLs",
+        "title": "URL Shortener API",
+        "contact": {},
+        "version": "1.0"
     },
+    "host": "localhost:8080",
+    "basePath": "/api/v1",
     "paths": {
         "/health": {
             "get": {
@@ -243,5 +248,15 @@
                 }
             }
         }
-    }
+    },
+    "tags": [
+        {
+            "description": "Operations with URLs",
+            "name": "URLs"
+        },
+        {
+            "description": "Health check",
+            "name": "Health"
+        }
+    ]
 }
