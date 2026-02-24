@@ -4,6 +4,7 @@ import (
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
 	"github.com/AbelHaro/url-shortener/backend/internal/repository"
 	"github.com/AbelHaro/url-shortener/backend/internal/utils"
+	"github.com/google/uuid"
 )
 
 type URLService struct {
@@ -24,7 +25,7 @@ func (svc *URLService) Store(originalURL string) (*domain.URL, error) {
 	}
 
 	url := &domain.URL{
-		ID:          "123",
+		ID:          uuid.New(),
 		OriginalURL: originalURL,
 		ShortURL:    shortURL,
 	}

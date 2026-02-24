@@ -17,7 +17,7 @@ func NewInMemoryURLRepository() URLRepository {
 }
 
 func (repo *InMemoryURLRepository) Store(url *domain.URL) error {
-	repo.urls[url.ID] = url
+	repo.urls[url.ShortURL] = url
 	return nil
 }
 

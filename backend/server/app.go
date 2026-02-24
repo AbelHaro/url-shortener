@@ -2,6 +2,7 @@ package server
 
 import (
 	httpDelivery "github.com/AbelHaro/url-shortener/backend/internal/delivery/http"
+	"github.com/AbelHaro/url-shortener/backend/internal/infrastructure/database"
 	"github.com/AbelHaro/url-shortener/backend/internal/repository"
 	"github.com/AbelHaro/url-shortener/backend/internal/service"
 	"github.com/gin-gonic/gin"
@@ -12,7 +13,11 @@ type App struct {
 }
 
 func NewApp() *App {
-	repo := repository.NewInMemoryURLRepository()
+	db, err := database.NewDB()
+	if err != nil {
+		panic(err)
+	}
+	repo := repository.NewPostgresURLRepository(db)
 	svc := service.NewURLService(repo)
 
 	router := gin.Default()

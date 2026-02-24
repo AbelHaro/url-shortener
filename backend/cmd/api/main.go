@@ -1,8 +1,16 @@
 package main
 
-import "github.com/AbelHaro/url-shortener/backend/server"
+import (
+	"fmt"
+
+	"github.com/AbelHaro/url-shortener/backend/server"
+)
 
 func main() {
 	app := server.NewApp()
-	app.Run(":8080")
+	err := app.Run(":8080")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 }

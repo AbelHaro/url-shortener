@@ -18,18 +18,20 @@ func NewURLHandler(svc *service.URLService) *URLHandler {
 func (h *URLHandler) RegisterRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1")
 	{
-		api.POST("/urls", h.Create)
+		api.POST("/shorten", h.Create)
 		api.GET("/urls/:id", h.FindByID)
 		api.DELETE("/urls/:id", h.Delete)
 		api.POST("/urls/search", h.FindByOriginalURL)
 	}
 
 	r.GET("/:shortURL", h.Redirect)
+
+	r.GET("/health", h.Health)
 }
 
 func (h *URLHandler) Create(c *gin.Context) {
 	var req struct {
-		URL string `json:"url" binding:"required"`
+		URL string `json:"long_url" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -114,4 +116,9 @@ func (h *URLHandler) FindByOriginalURL(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, url)
+}
+
+func (h *URLHandler) Health(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	return
 }
