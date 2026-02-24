@@ -32,7 +32,7 @@ func NewApp() *App {
 
 	router := gin.Default()
 	handler := httpDelivery.NewURLHandler(svc)
-	handler.RegisterRoutes(router)
+	httpDelivery.SetupRoutes(router, handler)
 
 	return &App{router: router, db: db}
 }

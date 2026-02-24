@@ -1,0 +1,159 @@
+definitions:
+  domain.URL:
+    properties:
+      id:
+        type: string
+      original_url:
+        type: string
+      short_url:
+        type: string
+    type: object
+  http.CreateShortenRequest:
+    properties:
+      long_url:
+        type: string
+    required:
+    - long_url
+    type: object
+  http.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  http.HealthResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  http.SearchByOriginalURLRequest:
+    properties:
+      url:
+        type: string
+    required:
+    - url
+    type: object
+info:
+  contact: {}
+paths:
+  /{shortURL}:
+    get:
+      description: Redirects a shortened URL to its original URL
+      parameters:
+      - description: Short URL
+        in: path
+        name: shortURL
+        required: true
+        type: string
+      responses:
+        "301":
+          description: Moved Permanently
+      summary: Redirect to original URL
+      tags:
+      - URLs
+  /health:
+    get:
+      description: Returns the health status of the API
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.HealthResponse'
+      summary: Health check
+      tags:
+      - Health
+  /shorten:
+    post:
+      consumes:
+      - application/json
+      description: Create a shortened URL from a long URL
+      parameters:
+      - description: Request body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.CreateShortenRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/domain.URL'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Shorten a URL
+      tags:
+      - URLs
+  /urls/{id}:
+    delete:
+      description: Delete a URL by its ID
+      parameters:
+      - description: URL ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Delete URL
+      tags:
+      - URLs
+    get:
+      description: Retrieve a URL by its ID
+      parameters:
+      - description: URL ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.URL'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Get URL by ID
+      tags:
+      - URLs
+  /urls/search:
+    post:
+      consumes:
+      - application/json
+      description: Find a shortened URL by its original URL
+      parameters:
+      - description: Request body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.SearchByOriginalURLRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.URL'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Search URL by original URL
+      tags:
+      - URLs
+swagger: "2.0"

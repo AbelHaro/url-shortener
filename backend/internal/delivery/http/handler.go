@@ -1,3 +1,8 @@
+// @title           URL Shortener API
+// @version         1.0
+// @description     API for shortening URLs
+// @host            localhost:8080
+// @BasePath        /api/v1
 package http
 
 import (
@@ -17,31 +22,25 @@ func NewURLHandler(svc *service.URLService) *URLHandler {
 	return &URLHandler{service: svc}
 }
 
-func (h *URLHandler) RegisterRoutes(r *gin.Engine) {
-	api := r.Group("/api/v1")
-	{
-		api.POST("/shorten", h.Create)
-		api.GET("/urls/:id", h.FindByID)
-		api.DELETE("/urls/:id", h.DeleteByID)
-		api.POST("/urls/search", h.FindByOriginalURL)
-	}
-
-	r.GET("/:shortURL", h.Redirect)
-
-	r.GET("/health", h.Health)
-}
-
+// Create shorten URL
+// @Summary Shorten a URL
+// @Description Create a shortened URL from a long URL
+// @Tags URLs
+// @Accept json
+// @Produce json
+// @Param request body CreateShortenRequest true "Request body"
+// @Success 201 {object} domain.URL
+// @Failure 400 {object} ErrorResponse
+// @Router /shorten [post]
 func (h *URLHandler) Create(c *gin.Context) {
-	var req struct {
-		URL string `json:"long_url" binding:"required"`
-	}
+	var req CreateShortenRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
 		return
 	}
 
-	url, err := h.service.Store(req.URL)
+	url, err := h.service.Store(req.LongURL)
 	if err != nil {
 		h.handleError(c, err)
 		return
@@ -50,6 +49,13 @@ func (h *URLHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, url)
 }
 
+// Redirect to original URL
+// @Summary Redirect to original URL
+// @Description Redirects a shortened URL to its original URL
+// @Tags URLs
+// @Param shortURL path string true "Short URL"
+// @Success 301
+// @Router /{shortURL} [get]
 func (h *URLHandler) Redirect(c *gin.Context) {
 	shortURL := c.Param("shortURL")
 
@@ -62,6 +68,15 @@ func (h *URLHandler) Redirect(c *gin.Context) {
 	c.Redirect(http.StatusMovedPermanently, url.OriginalURL)
 }
 
+// Find URL by ID
+// @Summary Get URL by ID
+// @Description Retrieve a URL by its ID
+// @Tags URLs
+// @Produce json
+// @Param id path string true "URL ID"
+// @Success 200 {object} domain.URL
+// @Failure 404 {object} ErrorResponse
+// @Router /urls/{id} [get]
 func (h *URLHandler) FindByID(c *gin.Context) {
 	id := c.Param("id")
 
@@ -74,6 +89,14 @@ func (h *URLHandler) FindByID(c *gin.Context) {
 	c.JSON(http.StatusOK, url)
 }
 
+// Delete URL by ID
+// @Summary Delete URL
+// @Description Delete a URL by its ID
+// @Tags URLs
+// @Param id path string true "URL ID"
+// @Success 204
+// @Failure 404 {object} ErrorResponse
+// @Router /urls/{id} [delete]
 func (h *URLHandler) DeleteByID(c *gin.Context) {
 	id := c.Param("id")
 
@@ -86,13 +109,21 @@ func (h *URLHandler) DeleteByID(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// Find URL by original URL
+// @Summary Search URL by original URL
+// @Description Find a shortened URL by its original URL
+// @Tags URLs
+// @Accept json
+// @Produce json
+// @Param request body SearchByOriginalURLRequest true "Request body"
+// @Success 200 {object} domain.URL
+// @Failure 404 {object} ErrorResponse
+// @Router /urls/search [post]
 func (h *URLHandler) FindByOriginalURL(c *gin.Context) {
-	var req struct {
-		URL string `json:"url" binding:"required"`
-	}
+	var req SearchByOriginalURLRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
 		return
 	}
 
@@ -103,26 +134,31 @@ func (h *URLHandler) FindByOriginalURL(c *gin.Context) {
 	}
 
 	if url == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "url not found"})
+		c.JSON(http.StatusNotFound, ErrorResponse{Error: "url not found"})
 		return
 	}
 
 	c.JSON(http.StatusOK, url)
 }
 
+// Health check
+// @Summary Health check
+// @Description Returns the health status of the API
+// @Tags Health
+// @Produce json
+// @Success 200 {object} HealthResponse
+// @Router /health [get]
 func (h *URLHandler) Health(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	c.JSON(http.StatusOK, HealthResponse{Status: "ok"})
 }
 
 func (h *URLHandler) handleError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrURLNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, ErrorResponse{Error: err.Error()})
 	case errors.Is(err, domain.ErrInvalidURL):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-	case errors.Is(err, domain.ErrURLNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 	default:
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "internal server error"})
 	}
 }
