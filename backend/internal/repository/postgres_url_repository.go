@@ -4,11 +4,16 @@ import (
 	"context"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type PostgresURLRepository struct {
 	db *gorm.DB
+}
+
+func NewPostgresURLRepository(db *gorm.DB) URLRepository {
+	return &PostgresURLRepository{db: db}
 }
 
 func (repo PostgresURLRepository) Store(url *domain.URL) error {
@@ -41,7 +46,7 @@ func (repo PostgresURLRepository) FindByShortURL(shortURL string) (*domain.URL, 
 	return &url, nil
 }
 
-func (repo PostgresURLRepository) FindByID(id string) (*domain.URL, error) {
+func (repo PostgresURLRepository) FindByID(id uuid.UUID) (*domain.URL, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -56,11 +61,7 @@ func (repo PostgresURLRepository) DeleteByShortURL(shortURL string) error {
 	panic("implement me")
 }
 
-func (repo PostgresURLRepository) DeleteByID(id string) error {
+func (repo PostgresURLRepository) DeleteByID(id uuid.UUID) error {
 	//TODO implement me
 	panic("implement me")
-}
-
-func NewPostgresURLRepository(db *gorm.DB) URLRepository {
-	return &PostgresURLRepository{db: db}
 }

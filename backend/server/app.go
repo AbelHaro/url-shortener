@@ -23,7 +23,7 @@ func NewApp() *App {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	repo := repository.NewGormURLRepository(db)
+	repo := repository.NewPostgresURLRepository(db)
 	svc := service.NewURLService(repo)
 
 	router := gin.Default()

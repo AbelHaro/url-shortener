@@ -1,13 +1,16 @@
 package repository
 
-import "github.com/AbelHaro/url-shortener/backend/internal/domain"
+import (
+	"github.com/AbelHaro/url-shortener/backend/internal/domain"
+	"github.com/google/uuid"
+)
 
 type URLRepository interface {
 	Store(url *domain.URL) error
 	FindByOriginalURL(originalURL string) (*domain.URL, error)
 	FindByShortURL(shortURL string) (*domain.URL, error)
-	FindByID(id string) (*domain.URL, error)
+	FindByID(id uuid.UUID) (*domain.URL, error)
 	DeleteByOriginalURL(originalURL string) error
 	DeleteByShortURL(shortURL string) error
-	DeleteByID(id string) error
+	DeleteByID(id uuid.UUID) error
 }
