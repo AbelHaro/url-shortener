@@ -58,7 +58,7 @@ func TestURLService_DeleteById(t *testing.T) {
 				}
 				tt.id = url.ID
 			}
-			err := svc.DeleteById(tt.id)
+			err := svc.DeleteByID(tt.id.String())
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("URLService.DeleteById() error = %v, wantErr %v", err, tt.wantErr)

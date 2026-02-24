@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"log"
 	"net/url"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
@@ -77,21 +78,31 @@ func (svc *URLService) FindByOriginalURL(originalURL string) (*domain.URL, error
 	return svc.repo.FindByOriginalURL(originalURL)
 }
 
-func (svc *URLService) DeleteById(id uuid.UUID) error {
-	_, err := svc.repo.FindByID(id)
+func (svc *URLService) DeleteByID(id string) error {
+	_, err := svc.repo.FindByID(uuid.MustParse(id))
 	if err != nil {
 		return domain.ErrURLNotFound
 	}
 
-	return svc.repo.DeleteByID(id)
+	return svc.repo.DeleteByID(uuid.MustParse(id))
 }
 
 func (svc *URLService) DeleteByOriginalURL(originalURL string) error {
-	panic("implement me")
+	_, err := svc.repo.FindByOriginalURL(originalURL)
+	if err != nil {
+		return domain.ErrURLNotFound
+	}
+
+	return svc.repo.DeleteByOriginalURL(originalURL)
 }
 
 func (svc *URLService) DeleteByShortURL(shortURL string) error {
-	panic("implement me")
+	_, err := svc.repo.FindByShortURL(shortURL)
+	if err != nil {
+		return domain.ErrURLNotFound
+	}
+
+	return svc.repo.DeleteByShortURL(shortURL)
 }
 
 func (svc *URLService) validateURL(rawURL string) error {
@@ -99,5 +110,26 @@ func (svc *URLService) validateURL(rawURL string) error {
 	if err != nil {
 		return errors.New("invalid url format")
 	}
+	return nil
+}
+
+func (svc *URLService) GenerateDevData() error {
+	urls := []string{
+		"https://google.com",
+		"https://github.com",
+		"https://stackoverflow.com",
+		"https://golang.org",
+		"https://gin-gonic.com",
+	}
+
+	for _, u := range urls {
+		log.Println("Storing url", u)
+		_, err := svc.Store(u)
+		if err != nil {
+			return err
+		}
+		log.Println("Stored url", u)
+	}
+
 	return nil
 }

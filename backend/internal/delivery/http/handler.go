@@ -22,7 +22,7 @@ func (h *URLHandler) RegisterRoutes(r *gin.Engine) {
 	{
 		api.POST("/shorten", h.Create)
 		api.GET("/urls/:id", h.FindByID)
-		api.DELETE("/urls/:id", h.Delete)
+		api.DELETE("/urls/:id", h.DeleteByID)
 		api.POST("/urls/search", h.FindByOriginalURL)
 	}
 
@@ -74,10 +74,10 @@ func (h *URLHandler) FindByID(c *gin.Context) {
 	c.JSON(http.StatusOK, url)
 }
 
-func (h *URLHandler) Delete(c *gin.Context) {
+func (h *URLHandler) DeleteByID(c *gin.Context) {
 	id := c.Param("id")
 
-	err := h.service.Delete(id)
+	err := h.service.DeleteByID(id)
 	if err != nil {
 		h.handleError(c, err)
 		return
@@ -120,6 +120,8 @@ func (h *URLHandler) handleError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, domain.ErrInvalidURL):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, domain.ErrURLNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 	}
