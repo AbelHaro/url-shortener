@@ -27,19 +27,19 @@ func (c *Config) DSN() string {
 
 func LoadConfig() *Config {
 	return &Config{
-		Host:     getEnv("DB_HOST", "localhost"),
-		Port:     getEnv("DB_PORT", "5432"),
-		User:     getEnv("DB_USER", "gorm"),
-		Password: getEnv("DB_PASSWORD", "gorm"),
-		DBName:   getEnv("DB_NAME", "gorm"),
+		Host:     getEnv("DB_HOST"),
+		Port:     getEnv("DB_PORT"),
+		User:     getEnv("DB_USER"),
+		Password: getEnv("DB_PASSWORD"),
+		DBName:   getEnv("DB_NAME"),
 	}
 }
 
-func getEnv(key, defaultValue string) string {
+func getEnv(key string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
-	return defaultValue
+	panic(fmt.Sprintf("environment variable %s not set", key))
 }
 
 func NewDB(cfg *Config) (*gorm.DB, error) {
