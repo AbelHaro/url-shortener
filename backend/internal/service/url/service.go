@@ -67,7 +67,11 @@ func (svc *Service) FindByShortURL(shortURL string) (*domain.URL, error) {
 }
 
 func (svc *Service) FindByID(id string) (*domain.URL, error) {
-	urlFound, err := svc.repo.FindByID(uuid.MustParse(id))
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, domain.ErrInternal
+	}
+	urlFound, err := svc.repo.FindByID(parsedID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,12 +93,19 @@ func (svc *Service) FindByOriginalURL(originalURL string) (*domain.URL, error) {
 }
 
 func (svc *Service) DeleteByID(id string) error {
-	_, err := svc.repo.FindByID(uuid.MustParse(id))
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return domain.ErrInternal
+	}
+	_, err = svc.repo.FindByID(parsedID)
 	if err != nil {
 		return domain.ErrURLNotFound
 	}
 
 	err = svc.repo.DeleteByID(uuid.MustParse(id))
+	if errors.Is(err, domain.ErrURLNotFound) {
+		return err
+	}
 	if err != nil {
 		return domain.ErrInternal
 	}
