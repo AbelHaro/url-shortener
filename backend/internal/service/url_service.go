@@ -7,17 +7,18 @@ import (
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
 	"github.com/AbelHaro/url-shortener/backend/internal/repository"
-	"github.com/AbelHaro/url-shortener/backend/internal/utils"
 	"github.com/google/uuid"
 )
 
 type URLService struct {
-	repo repository.URLRepository
+	repo           repository.URLRepository
+	counterService *CounterService
 }
 
-func NewURLService(repo repository.URLRepository) *URLService {
+func NewURLService(repo repository.URLRepository, counterService *CounterService) *URLService {
 	return &URLService{
-		repo: repo,
+		repo:           repo,
+		counterService: counterService,
 	}
 }
 
@@ -27,14 +28,15 @@ func (svc *URLService) Store(originalURL string) (*domain.URL, error) {
 	}
 
 	existing, err := svc.repo.FindByOriginalURL(originalURL)
-	if err != nil {
+	if err != nil && errors.Is(err, domain.ErrInternal) {
 		return nil, err
 	}
+
 	if existing != nil {
 		return existing, nil
 	}
 
-	shortURL, err := utils.GenerateShortURL(originalURL)
+	shortURL, err := svc.counterService.GenerateShortHash()
 	if err != nil {
 		return nil, err
 	}

@@ -23,12 +23,19 @@ func NewApp() *App {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	repo := repository.NewPostgresURLRepository(db)
-	svc := service.NewURLService(repo)
-	//err = svc.GenerateDevData()
-	//if err != nil {
-	//	log.Fatalf("Failed to generate dev data: %v", err)
-	//}
+	urlRepo := repository.NewPostgresURLRepository(db)
+	hashCounterRepo := repository.NewPostgresHashCounterRepository(db)
+
+	counterSvc, err := service.NewCounterService(hashCounterRepo)
+	if err != nil {
+		log.Fatalf("Failed to initialize counter service: %v", err)
+	}
+
+	svc := service.NewURLService(urlRepo, counterSvc)
+	err = svc.GenerateDevData()
+	if err != nil {
+		log.Fatalf("Failed to generate dev data: %v", err)
+	}
 
 	router := gin.Default()
 	handler := httpDelivery.NewURLHandler(svc)

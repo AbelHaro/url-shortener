@@ -9,7 +9,8 @@ import (
 
 func TestURLService_Store(t *testing.T) {
 	repo := repository.NewMockURLRepository()
-	svc := NewURLService(repo)
+
+	svc := NewURLService(repo, nil)
 
 	tests := []struct {
 		name        string
@@ -36,7 +37,7 @@ func TestURLService_Store(t *testing.T) {
 
 func TestURLService_DeleteById(t *testing.T) {
 	repo := repository.NewMockURLRepository()
-	svc := NewURLService(repo)
+	svc := NewURLService(repo, nil)
 
 	tests := []struct {
 		name        string

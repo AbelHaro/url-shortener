@@ -29,7 +29,10 @@ func (repo PostgresURLRepository) FindByOriginalURL(originalURL string) (*domain
 	url, err := gorm.G[domain.URL](repo.db).Where("original_url = ?", originalURL).First(ctx)
 
 	if err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrURLNotFound
+		}
+		return nil, domain.ErrInternal
 	}
 
 	return &url, nil
@@ -41,6 +44,9 @@ func (repo PostgresURLRepository) FindByShortURL(shortURL string) (*domain.URL, 
 	url, err := gorm.G[domain.URL](repo.db).Where("short_url = ?", shortURL).First(ctx)
 
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -52,6 +58,9 @@ func (repo PostgresURLRepository) FindByID(id uuid.UUID) (*domain.URL, error) {
 	url, err := gorm.G[domain.URL](repo.db).Where("id = ?", id).First(ctx)
 
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 

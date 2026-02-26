@@ -1,0 +1,60 @@
+package repository
+
+import (
+	"context"
+	"errors"
+
+	"github.com/AbelHaro/url-shortener/backend/internal/domain"
+	"gorm.io/gorm"
+)
+
+type PostgresHashCounterRepository struct {
+	db *gorm.DB
+}
+
+func NewPostgresHashCounterRepository(db *gorm.DB) HashCounterRepository {
+	return &PostgresHashCounterRepository{db: db}
+}
+
+func (repo *PostgresHashCounterRepository) GetCounter() (*domain.HashCounter, error) {
+	ctx := context.Background()
+
+	counter, err := gorm.G[domain.HashCounter](repo.db).First(ctx)
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			newCounter := &domain.HashCounter{
+				Counter: 0,
+			}
+			if err := gorm.G[domain.HashCounter](repo.db).Create(ctx, newCounter); err != nil {
+				return nil, err
+			}
+			return newCounter, nil
+		}
+		return nil, err
+	}
+
+	return &counter, nil
+}
+
+func (repo *PostgresHashCounterRepository) UpdateCounter(counter int64) error {
+	ctx := context.Background()
+
+	hashCounter, err := gorm.G[domain.HashCounter](repo.db).First(ctx)
+
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := gorm.G[domain.HashCounter](repo.db).Where("id = ?", hashCounter.ID).Update(ctx, "counter", counter)
+
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected != 1 {
+
+	}
+
+	return err
+}
