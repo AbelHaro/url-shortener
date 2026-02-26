@@ -16,17 +16,17 @@ func NewPostgresCounterRepository(db *gorm.DB) CounterRepository {
 	return &PostgresCounterRepository{db: db}
 }
 
-func (repo *PostgresCounterRepository) GetCounter() (*domain.HashCounter, error) {
+func (repo *PostgresCounterRepository) GetCounter() (*domain.Counter, error) {
 	ctx := context.Background()
 
-	counter, err := gorm.G[domain.HashCounter](repo.db).First(ctx)
+	counter, err := gorm.G[domain.Counter](repo.db).First(ctx)
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			newCounter := &domain.HashCounter{
+			newCounter := &domain.Counter{
 				Counter: 0,
 			}
-			if err := gorm.G[domain.HashCounter](repo.db).Create(ctx, newCounter); err != nil {
+			if err := gorm.G[domain.Counter](repo.db).Create(ctx, newCounter); err != nil {
 				return nil, err
 			}
 			return newCounter, nil
@@ -40,13 +40,13 @@ func (repo *PostgresCounterRepository) GetCounter() (*domain.HashCounter, error)
 func (repo *PostgresCounterRepository) UpdateCounter(counter int64) error {
 	ctx := context.Background()
 
-	hashCounter, err := gorm.G[domain.HashCounter](repo.db).First(ctx)
+	hashCounter, err := gorm.G[domain.Counter](repo.db).First(ctx)
 
 	if err != nil {
 		return err
 	}
 
-	rowsAffected, err := gorm.G[domain.HashCounter](repo.db).Where("id = ?", hashCounter.ID).Update(ctx, "counter", counter)
+	rowsAffected, err := gorm.G[domain.Counter](repo.db).Where("id = ?", hashCounter.ID).Update(ctx, "counter", counter)
 
 	if err != nil {
 		return err

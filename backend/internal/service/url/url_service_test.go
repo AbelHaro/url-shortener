@@ -3,14 +3,27 @@ package url
 import (
 	"testing"
 
+	counterRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/counter"
 	"github.com/AbelHaro/url-shortener/backend/internal/repository/url"
+	counterSvc "github.com/AbelHaro/url-shortener/backend/internal/service/counter"
 	"github.com/google/uuid"
 )
 
-func TestURLService_Store(t *testing.T) {
+func provideURLService() (*URLService, error) {
 	repo := url.NewMockURLRepository()
+	counterRepoInstance := counterRepo.NewMockCounterRepository()
+	counterSvcInstance, err := counterSvc.NewCounterService(counterRepoInstance)
+	if err != nil {
+		return nil, err
+	}
+	return NewURLService(repo, counterSvcInstance), nil
+}
 
-	svc := NewURLService(repo, nil)
+func TestURLService_Store(t *testing.T) {
+	svc, err := provideURLService()
+	if err != nil {
+		t.Fatalf("provideURLService() error = %v", err)
+	}
 
 	tests := []struct {
 		name        string
@@ -36,8 +49,10 @@ func TestURLService_Store(t *testing.T) {
 }
 
 func TestURLService_DeleteById(t *testing.T) {
-	repo := url.NewMockURLRepository()
-	svc := NewURLService(repo, nil)
+	svc, err := provideURLService()
+	if err != nil {
+		t.Fatalf("provideURLService() error = %v", err)
+	}
 
 	tests := []struct {
 		name        string
@@ -53,11 +68,11 @@ func TestURLService_DeleteById(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			if tt.id == uuid.Nil {
-				url, err := svc.Store(tt.originalURL)
+				urlInserted, err := svc.Store(tt.originalURL)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("URLService.Store() error = %v, wantErr %v", err, tt.wantErr)
 				}
-				tt.id = url.ID
+				tt.id = urlInserted.ID
 			}
 			err := svc.DeleteByID(tt.id.String())
 
@@ -66,5 +81,4 @@ func TestURLService_DeleteById(t *testing.T) {
 			}
 		})
 	}
-
 }
