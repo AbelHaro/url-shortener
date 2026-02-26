@@ -24,7 +24,7 @@ func NewService(repo urlRepo.Repository, counterService *counter.Service) *Servi
 }
 
 func (svc *Service) Store(originalURL string) (*domain.URL, error) {
-	if err := svc.validateURL(originalURL); err != nil {
+	if err := svc.ValidateURL(originalURL); err != nil {
 		return nil, err
 	}
 
@@ -39,7 +39,7 @@ func (svc *Service) Store(originalURL string) (*domain.URL, error) {
 
 	shortURL, err := svc.counterService.GenerateShortHash()
 	if err != nil {
-		return nil, err
+		return nil, domain.ErrInternal
 	}
 
 	urlToInsert := &domain.URL{
@@ -49,7 +49,7 @@ func (svc *Service) Store(originalURL string) (*domain.URL, error) {
 	}
 
 	if err := svc.repo.Store(urlToInsert); err != nil {
-		return nil, err
+		return nil, domain.ErrInternal
 	}
 
 	return urlToInsert, nil
@@ -71,14 +71,21 @@ func (svc *Service) FindByID(id string) (*domain.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	if urlFound != nil {
+	if urlFound == nil {
 		return nil, domain.ErrURLNotFound
 	}
 	return urlFound, nil
 }
 
 func (svc *Service) FindByOriginalURL(originalURL string) (*domain.URL, error) {
-	return svc.repo.FindByOriginalURL(originalURL)
+	urlFound, err := svc.repo.FindByOriginalURL(originalURL)
+	if err != nil {
+		return nil, domain.ErrInternal
+	}
+	if urlFound == nil {
+		return nil, domain.ErrURLNotFound
+	}
+	return urlFound, nil
 }
 
 func (svc *Service) DeleteByID(id string) error {
@@ -87,7 +94,11 @@ func (svc *Service) DeleteByID(id string) error {
 		return domain.ErrURLNotFound
 	}
 
-	return svc.repo.DeleteByID(uuid.MustParse(id))
+	err = svc.repo.DeleteByID(uuid.MustParse(id))
+	if err != nil {
+		return domain.ErrInternal
+	}
+	return nil
 }
 
 func (svc *Service) DeleteByOriginalURL(originalURL string) error {
@@ -96,7 +107,11 @@ func (svc *Service) DeleteByOriginalURL(originalURL string) error {
 		return domain.ErrURLNotFound
 	}
 
-	return svc.repo.DeleteByOriginalURL(originalURL)
+	err = svc.repo.DeleteByOriginalURL(originalURL)
+	if err != nil {
+		return domain.ErrInternal
+	}
+	return nil
 }
 
 func (svc *Service) DeleteByShortURL(shortURL string) error {
@@ -105,10 +120,14 @@ func (svc *Service) DeleteByShortURL(shortURL string) error {
 		return domain.ErrURLNotFound
 	}
 
-	return svc.repo.DeleteByShortURL(shortURL)
+	err = svc.repo.DeleteByShortURL(shortURL)
+	if err != nil {
+		return domain.ErrInternal
+	}
+	return nil
 }
 
-func (svc *Service) validateURL(rawURL string) error {
+func (svc *Service) ValidateURL(rawURL string) error {
 	_, err := url.ParseRequestURI(rawURL)
 	if err != nil {
 		return errors.New("invalid url format")
