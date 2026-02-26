@@ -3,10 +3,13 @@ package server
 import (
 	"log"
 
-	httpDelivery "github.com/AbelHaro/url-shortener/backend/internal/delivery/http"
+	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http"
 	"github.com/AbelHaro/url-shortener/backend/internal/infrastructure/database"
-	"github.com/AbelHaro/url-shortener/backend/internal/repository"
-	"github.com/AbelHaro/url-shortener/backend/internal/service"
+	counterRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/counter"
+	urlRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/url"
+	counterSvc "github.com/AbelHaro/url-shortener/backend/internal/service/counter"
+	urlSvc "github.com/AbelHaro/url-shortener/backend/internal/service/url"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -23,23 +26,23 @@ func NewApp() *App {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	urlRepo := repository.NewPostgresURLRepository(db)
-	hashCounterRepo := repository.NewPostgresHashCounterRepository(db)
+	urlRepoInstance := urlRepo.NewPostgresURLRepository(db)
+	counterRepoInstance := counterRepo.NewPostgresCounterRepository(db)
 
-	counterSvc, err := service.NewCounterService(hashCounterRepo)
+	counter, err := counterSvc.NewCounterService(counterRepoInstance)
 	if err != nil {
 		log.Fatalf("Failed to initialize counter service: %v", err)
 	}
 
-	svc := service.NewURLService(urlRepo, counterSvc)
+	svc := urlSvc.NewURLService(urlRepoInstance, counter)
 	err = svc.GenerateDevData()
 	if err != nil {
 		log.Fatalf("Failed to generate dev data: %v", err)
 	}
 
 	router := gin.Default()
-	handler := httpDelivery.NewURLHandler(svc)
-	httpDelivery.SetupRoutes(router, handler)
+	handler := http.NewURLHandler(svc)
+	http.SetupRoutes(router, handler)
 
 	return &App{router: router, db: db}
 }

@@ -10,15 +10,15 @@ import (
 	"net/http"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
-	"github.com/AbelHaro/url-shortener/backend/internal/service"
+	"github.com/AbelHaro/url-shortener/backend/internal/service/url"
 	"github.com/gin-gonic/gin"
 )
 
 type URLHandler struct {
-	service *service.URLService
+	service *url.URLService
 }
 
-func NewURLHandler(svc *service.URLService) *URLHandler {
+func NewURLHandler(svc *url.URLService) *URLHandler {
 	return &URLHandler{service: svc}
 }
 

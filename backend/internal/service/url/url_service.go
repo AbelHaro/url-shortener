@@ -1,4 +1,4 @@
-package service
+package url
 
 import (
 	"errors"
@@ -6,16 +6,17 @@ import (
 	"net/url"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
-	"github.com/AbelHaro/url-shortener/backend/internal/repository"
+	url2 "github.com/AbelHaro/url-shortener/backend/internal/repository/url"
+	"github.com/AbelHaro/url-shortener/backend/internal/service/counter"
 	"github.com/google/uuid"
 )
 
 type URLService struct {
-	repo           repository.URLRepository
-	counterService *CounterService
+	repo           url2.URLRepository
+	counterService *counter.CounterService
 }
 
-func NewURLService(repo repository.URLRepository, counterService *CounterService) *URLService {
+func NewURLService(repo url2.URLRepository, counterService *counter.CounterService) *URLService {
 	return &URLService{
 		repo:           repo,
 		counterService: counterService,

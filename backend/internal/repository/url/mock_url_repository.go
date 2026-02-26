@@ -1,4 +1,4 @@
-package repository
+package url
 
 import (
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"

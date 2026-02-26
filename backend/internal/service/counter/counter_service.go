@@ -1,10 +1,10 @@
-package service
+package counter
 
 import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/AbelHaro/url-shortener/backend/internal/repository"
+	counterRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/counter"
 )
 
 const base62Chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -12,10 +12,10 @@ const base62Chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW
 type CounterService struct {
 	mu      sync.RWMutex
 	counter int64
-	repo    repository.HashCounterRepository
+	repo    counterRepo.CounterRepository
 }
 
-func NewCounterService(repo repository.HashCounterRepository) (*CounterService, error) {
+func NewCounterService(repo counterRepo.CounterRepository) (*CounterService, error) {
 	svc := &CounterService{
 		repo: repo,
 	}

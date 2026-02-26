@@ -1,14 +1,14 @@
-package service
+package url
 
 import (
 	"testing"
 
-	"github.com/AbelHaro/url-shortener/backend/internal/repository"
+	"github.com/AbelHaro/url-shortener/backend/internal/repository/url"
 	"github.com/google/uuid"
 )
 
 func TestURLService_Store(t *testing.T) {
-	repo := repository.NewMockURLRepository()
+	repo := url.NewMockURLRepository()
 
 	svc := NewURLService(repo, nil)
 
@@ -36,7 +36,7 @@ func TestURLService_Store(t *testing.T) {
 }
 
 func TestURLService_DeleteById(t *testing.T) {
-	repo := repository.NewMockURLRepository()
+	repo := url.NewMockURLRepository()
 	svc := NewURLService(repo, nil)
 
 	tests := []struct {
