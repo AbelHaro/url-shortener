@@ -14,20 +14,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Navigate to backend
-        run: cd backend
-
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: backend/go.mod
           cache: 'true'
 
       - name: Verify dependencies
+        working-directory: backend
         run: go mod tidy
 
       - name: Run tests
+        working-directory: backend
         run: go test -v ./...
 
       - name: Run tests with coverage
+        working-directory: backend
         run: go test -cover ./...
