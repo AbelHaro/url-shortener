@@ -50,7 +50,13 @@ func NewDB(cfg *Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	if err := db.AutoMigrate(&domain.URL{}, &domain.Counter{}); err != nil {
+	// Centralized entity registration for migrations
+	entities := []interface{}{
+		&domain.URL{},
+		&domain.Counter{},
+	}
+
+	if err := db.AutoMigrate(entities...); err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}
 

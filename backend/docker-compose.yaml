@@ -3,13 +3,20 @@ services:
   db:
     image : postgres:18
     container_name: url-shortener-postgres-db
-    restart: always
-    env_file:
-      - .env
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/
     ports:
       - "5432:5432"
 
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 volumes:
   pgdata:
