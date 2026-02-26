@@ -6,24 +6,24 @@ import (
 	"net/url"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
-	url2 "github.com/AbelHaro/url-shortener/backend/internal/repository/url"
+	urlRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/url"
 	"github.com/AbelHaro/url-shortener/backend/internal/service/counter"
 	"github.com/google/uuid"
 )
 
-type URLService struct {
-	repo           url2.URLRepository
-	counterService *counter.CounterService
+type Service struct {
+	repo           urlRepo.Repository
+	counterService *counter.Service
 }
 
-func NewURLService(repo url2.URLRepository, counterService *counter.CounterService) *URLService {
-	return &URLService{
+func NewService(repo urlRepo.Repository, counterService *counter.Service) *Service {
+	return &Service{
 		repo:           repo,
 		counterService: counterService,
 	}
 }
 
-func (svc *URLService) Store(originalURL string) (*domain.URL, error) {
+func (svc *Service) Store(originalURL string) (*domain.URL, error) {
 	if err := svc.validateURL(originalURL); err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (svc *URLService) Store(originalURL string) (*domain.URL, error) {
 	return urlToInsert, nil
 }
 
-func (svc *URLService) FindByShortURL(shortURL string) (*domain.URL, error) {
+func (svc *Service) FindByShortURL(shortURL string) (*domain.URL, error) {
 	urlFound, err := svc.repo.FindByShortURL(shortURL)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (svc *URLService) FindByShortURL(shortURL string) (*domain.URL, error) {
 	return urlFound, nil
 }
 
-func (svc *URLService) FindByID(id string) (*domain.URL, error) {
+func (svc *Service) FindByID(id string) (*domain.URL, error) {
 	urlFound, err := svc.repo.FindByID(uuid.MustParse(id))
 	if err != nil {
 		return nil, err
@@ -77,11 +77,11 @@ func (svc *URLService) FindByID(id string) (*domain.URL, error) {
 	return urlFound, nil
 }
 
-func (svc *URLService) FindByOriginalURL(originalURL string) (*domain.URL, error) {
+func (svc *Service) FindByOriginalURL(originalURL string) (*domain.URL, error) {
 	return svc.repo.FindByOriginalURL(originalURL)
 }
 
-func (svc *URLService) DeleteByID(id string) error {
+func (svc *Service) DeleteByID(id string) error {
 	_, err := svc.repo.FindByID(uuid.MustParse(id))
 	if err != nil {
 		return domain.ErrURLNotFound
@@ -90,7 +90,7 @@ func (svc *URLService) DeleteByID(id string) error {
 	return svc.repo.DeleteByID(uuid.MustParse(id))
 }
 
-func (svc *URLService) DeleteByOriginalURL(originalURL string) error {
+func (svc *Service) DeleteByOriginalURL(originalURL string) error {
 	_, err := svc.repo.FindByOriginalURL(originalURL)
 	if err != nil {
 		return domain.ErrURLNotFound
@@ -99,7 +99,7 @@ func (svc *URLService) DeleteByOriginalURL(originalURL string) error {
 	return svc.repo.DeleteByOriginalURL(originalURL)
 }
 
-func (svc *URLService) DeleteByShortURL(shortURL string) error {
+func (svc *Service) DeleteByShortURL(shortURL string) error {
 	_, err := svc.repo.FindByShortURL(shortURL)
 	if err != nil {
 		return domain.ErrURLNotFound
@@ -108,7 +108,7 @@ func (svc *URLService) DeleteByShortURL(shortURL string) error {
 	return svc.repo.DeleteByShortURL(shortURL)
 }
 
-func (svc *URLService) validateURL(rawURL string) error {
+func (svc *Service) validateURL(rawURL string) error {
 	_, err := url.ParseRequestURI(rawURL)
 	if err != nil {
 		return errors.New("invalid url format")
@@ -116,7 +116,7 @@ func (svc *URLService) validateURL(rawURL string) error {
 	return nil
 }
 
-func (svc *URLService) GenerateDevData() error {
+func (svc *Service) GenerateDevData() error {
 	urls := []string{
 		"https://google.com",
 		"https://github.com",

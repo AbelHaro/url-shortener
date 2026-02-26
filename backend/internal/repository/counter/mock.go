@@ -7,12 +7,12 @@ import (
 	"github.com/google/uuid"
 )
 
-type MockCounterRepository struct {
+type MockRepository struct {
 	counter domain.Counter
 }
 
-func NewMockCounterRepository() *MockCounterRepository {
-	return &MockCounterRepository{
+func NewMockRepository() *MockRepository {
+	return &MockRepository{
 		counter: domain.Counter{
 			ID:        uuid.New(),
 			Counter:   0,
@@ -20,11 +20,11 @@ func NewMockCounterRepository() *MockCounterRepository {
 		},
 	}
 }
-func (m MockCounterRepository) GetCounter() (*domain.Counter, error) {
+func (m MockRepository) GetCounter() (*domain.Counter, error) {
 	return &m.counter, nil
 }
 
-func (m MockCounterRepository) UpdateCounter(counter int64) error {
+func (m MockRepository) UpdateCounter(counter int64) error {
 	m.counter.Counter += counter
 	return nil
 }

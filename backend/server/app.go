@@ -26,15 +26,15 @@ func NewApp() *App {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	urlRepoInstance := urlRepo.NewPostgresURLRepository(db)
-	counterRepoInstance := counterRepo.NewPostgresCounterRepository(db)
+	urlRepoInstance := urlRepo.NewPostgresRepository(db)
+	counterRepoInstance := counterRepo.NewPostgresRepository(db)
 
-	counter, err := counterSvc.NewCounterService(counterRepoInstance)
+	counter, err := counterSvc.NewService(counterRepoInstance)
 	if err != nil {
 		log.Fatalf("Failed to initialize counter service: %v", err)
 	}
 
-	svc := urlSvc.NewURLService(urlRepoInstance, counter)
+	svc := urlSvc.NewService(urlRepoInstance, counter)
 	err = svc.GenerateDevData()
 	if err != nil {
 		log.Fatalf("Failed to generate dev data: %v", err)

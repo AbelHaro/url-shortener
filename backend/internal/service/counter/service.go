@@ -9,14 +9,14 @@ import (
 
 const base62Chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-type CounterService struct {
+type Service struct {
 	mu      sync.RWMutex
 	counter int64
-	repo    counterRepo.CounterRepository
+	repo    counterRepo.Repository
 }
 
-func NewCounterService(repo counterRepo.CounterRepository) (*CounterService, error) {
-	svc := &CounterService{
+func NewService(repo counterRepo.Repository) (*Service, error) {
+	svc := &Service{
 		repo: repo,
 	}
 
@@ -31,11 +31,10 @@ func NewCounterService(repo counterRepo.CounterRepository) (*CounterService, err
 	return svc, nil
 }
 
-func (svc *CounterService) NextBase62() (string, error) {
+func (svc *Service) NextBase62() (string, error) {
 	newVal := atomic.AddInt64(&svc.counter, 1)
 
 	if err := svc.repo.UpdateCounter(newVal); err != nil {
-		//Rollback of the updated number
 		atomic.AddInt64(&svc.counter, -1)
 		return "", err
 	}
@@ -43,7 +42,7 @@ func (svc *CounterService) NextBase62() (string, error) {
 	return svc.ToBase62(newVal), nil
 }
 
-func (svc *CounterService) ToBase62(n int64) string {
+func (svc *Service) ToBase62(n int64) string {
 	if n == 0 {
 		return string(base62Chars[0])
 	}
@@ -59,7 +58,7 @@ func (svc *CounterService) ToBase62(n int64) string {
 	return string(result)
 }
 
-func (svc *CounterService) PadBase62(s string, length int) string {
+func (svc *Service) PadBase62(s string, length int) string {
 	if len(s) >= length {
 		return s
 	}
@@ -70,7 +69,7 @@ func (svc *CounterService) PadBase62(s string, length int) string {
 	return string(padding) + s
 }
 
-func (svc *CounterService) indexOf(char rune, s string) int {
+func (svc *Service) indexOf(char rune, s string) int {
 	for i, c := range s {
 		if c == char {
 			return i
@@ -79,7 +78,7 @@ func (svc *CounterService) indexOf(char rune, s string) int {
 	return -1
 }
 
-func (svc *CounterService) GenerateShortHash() (string, error) {
+func (svc *Service) GenerateShortHash() (string, error) {
 	num, err := svc.NextBase62()
 	if err != nil {
 		return "", err

@@ -9,21 +9,21 @@ import (
 	"gorm.io/gorm"
 )
 
-type PostgresURLRepository struct {
+type PostgresRepository struct {
 	db *gorm.DB
 }
 
-func NewPostgresURLRepository(db *gorm.DB) URLRepository {
-	return &PostgresURLRepository{db: db}
+func NewPostgresRepository(db *gorm.DB) Repository {
+	return &PostgresRepository{db: db}
 }
 
-func (repo PostgresURLRepository) Store(url *domain.URL) error {
+func (repo PostgresRepository) Store(url *domain.URL) error {
 	ctx := context.Background()
 	return gorm.G[domain.URL](repo.db).Create(ctx, url)
 
 }
 
-func (repo PostgresURLRepository) FindByOriginalURL(originalURL string) (*domain.URL, error) {
+func (repo PostgresRepository) FindByOriginalURL(originalURL string) (*domain.URL, error) {
 	ctx := context.Background()
 
 	url, err := gorm.G[domain.URL](repo.db).Where("original_url = ?", originalURL).First(ctx)
@@ -38,7 +38,7 @@ func (repo PostgresURLRepository) FindByOriginalURL(originalURL string) (*domain
 	return &url, nil
 }
 
-func (repo PostgresURLRepository) FindByShortURL(shortURL string) (*domain.URL, error) {
+func (repo PostgresRepository) FindByShortURL(shortURL string) (*domain.URL, error) {
 	ctx := context.Background()
 
 	url, err := gorm.G[domain.URL](repo.db).Where("short_url = ?", shortURL).First(ctx)
@@ -53,7 +53,7 @@ func (repo PostgresURLRepository) FindByShortURL(shortURL string) (*domain.URL, 
 	return &url, nil
 }
 
-func (repo PostgresURLRepository) FindByID(id uuid.UUID) (*domain.URL, error) {
+func (repo PostgresRepository) FindByID(id uuid.UUID) (*domain.URL, error) {
 	ctx := context.Background()
 	url, err := gorm.G[domain.URL](repo.db).Where("id = ?", id).First(ctx)
 
@@ -67,7 +67,7 @@ func (repo PostgresURLRepository) FindByID(id uuid.UUID) (*domain.URL, error) {
 	return &url, nil
 }
 
-func (repo PostgresURLRepository) DeleteByOriginalURL(originalURL string) error {
+func (repo PostgresRepository) DeleteByOriginalURL(originalURL string) error {
 	ctx := context.Background()
 
 	rowsAffected, err := gorm.G[domain.URL](repo.db).Where("original_url = ?", originalURL).Delete(ctx)
@@ -86,7 +86,7 @@ func (repo PostgresURLRepository) DeleteByOriginalURL(originalURL string) error 
 	return nil
 }
 
-func (repo PostgresURLRepository) DeleteByShortURL(shortURL string) error {
+func (repo PostgresRepository) DeleteByShortURL(shortURL string) error {
 	ctx := context.Background()
 
 	rowsAffected, err := gorm.G[domain.URL](repo.db).Where("short_url = ?", shortURL).Delete(ctx)
@@ -105,7 +105,7 @@ func (repo PostgresURLRepository) DeleteByShortURL(shortURL string) error {
 	return nil
 }
 
-func (repo PostgresURLRepository) DeleteByID(id uuid.UUID) error {
+func (repo PostgresRepository) DeleteByID(id uuid.UUID) error {
 	ctx := context.Background()
 
 	rowsAffected, err := gorm.G[domain.URL](repo.db).Where("id = ?", id).Delete(ctx)

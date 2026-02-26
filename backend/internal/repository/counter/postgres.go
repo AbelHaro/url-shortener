@@ -8,15 +8,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type PostgresCounterRepository struct {
+type PostgresRepository struct {
 	db *gorm.DB
 }
 
-func NewPostgresCounterRepository(db *gorm.DB) CounterRepository {
-	return &PostgresCounterRepository{db: db}
+func NewPostgresRepository(db *gorm.DB) Repository {
+	return &PostgresRepository{db: db}
 }
 
-func (repo *PostgresCounterRepository) GetCounter() (*domain.Counter, error) {
+func (repo *PostgresRepository) GetCounter() (*domain.Counter, error) {
 	ctx := context.Background()
 
 	counter, err := gorm.G[domain.Counter](repo.db).First(ctx)
@@ -37,7 +37,7 @@ func (repo *PostgresCounterRepository) GetCounter() (*domain.Counter, error) {
 	return &counter, nil
 }
 
-func (repo *PostgresCounterRepository) UpdateCounter(counter int64) error {
+func (repo *PostgresRepository) UpdateCounter(counter int64) error {
 	ctx := context.Background()
 
 	hashCounter, err := gorm.G[domain.Counter](repo.db).First(ctx)

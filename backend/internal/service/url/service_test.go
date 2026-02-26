@@ -9,20 +9,20 @@ import (
 	"github.com/google/uuid"
 )
 
-func provideURLService() (*URLService, error) {
-	repo := url.NewMockURLRepository()
-	counterRepoInstance := counterRepo.NewMockCounterRepository()
-	counterSvcInstance, err := counterSvc.NewCounterService(counterRepoInstance)
+func provideService() (*Service, error) {
+	repo := url.NewMockRepository()
+	counterRepoInstance := counterRepo.NewMockRepository()
+	counterSvcInstance, err := counterSvc.NewService(counterRepoInstance)
 	if err != nil {
 		return nil, err
 	}
-	return NewURLService(repo, counterSvcInstance), nil
+	return NewService(repo, counterSvcInstance), nil
 }
 
-func TestURLService_Store(t *testing.T) {
-	svc, err := provideURLService()
+func TestService_Store(t *testing.T) {
+	svc, err := provideService()
 	if err != nil {
-		t.Fatalf("provideURLService() error = %v", err)
+		t.Fatalf("provideService() error = %v", err)
 	}
 
 	tests := []struct {
@@ -42,16 +42,16 @@ func TestURLService_Store(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := svc.Store(tt.originalURL)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("URLService.Store() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Service.Store() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestURLService_DeleteById(t *testing.T) {
-	svc, err := provideURLService()
+func TestService_DeleteById(t *testing.T) {
+	svc, err := provideService()
 	if err != nil {
-		t.Fatalf("provideURLService() error = %v", err)
+		t.Fatalf("provideService() error = %v", err)
 	}
 
 	tests := []struct {
@@ -70,14 +70,14 @@ func TestURLService_DeleteById(t *testing.T) {
 			if tt.id == uuid.Nil {
 				urlInserted, err := svc.Store(tt.originalURL)
 				if (err != nil) != tt.wantErr {
-					t.Errorf("URLService.Store() error = %v, wantErr %v", err, tt.wantErr)
+					t.Errorf("Service.Store() error = %v, wantErr %v", err, tt.wantErr)
 				}
 				tt.id = urlInserted.ID
 			}
 			err := svc.DeleteByID(tt.id.String())
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("URLService.DeleteById() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Service.DeleteById() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

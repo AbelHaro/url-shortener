@@ -5,19 +5,19 @@ import (
 	"github.com/google/uuid"
 )
 
-type MockURLRepository struct {
+type MockRepository struct {
 	urls map[string]*domain.URL
 }
 
-func NewMockURLRepository() *MockURLRepository {
-	return &MockURLRepository{urls: make(map[string]*domain.URL)}
+func NewMockRepository() *MockRepository {
+	return &MockRepository{urls: make(map[string]*domain.URL)}
 }
 
-func (m *MockURLRepository) Store(url *domain.URL) error {
+func (m *MockRepository) Store(url *domain.URL) error {
 	m.urls[url.ShortURL] = url
 	return nil
 }
-func (m *MockURLRepository) FindByOriginalURL(originalURL string) (*domain.URL, error) {
+func (m *MockRepository) FindByOriginalURL(originalURL string) (*domain.URL, error) {
 	for _, url := range m.urls {
 		if url.OriginalURL == originalURL {
 			return url, nil
@@ -25,13 +25,13 @@ func (m *MockURLRepository) FindByOriginalURL(originalURL string) (*domain.URL, 
 	}
 	return nil, nil
 }
-func (m *MockURLRepository) FindByShortURL(shortURL string) (*domain.URL, error) {
+func (m *MockRepository) FindByShortURL(shortURL string) (*domain.URL, error) {
 	if url, ok := m.urls[shortURL]; ok {
 		return url, nil
 	}
 	return nil, nil
 }
-func (m *MockURLRepository) FindByID(id uuid.UUID) (*domain.URL, error) {
+func (m *MockRepository) FindByID(id uuid.UUID) (*domain.URL, error) {
 	for _, url := range m.urls {
 		if url.ID == id {
 			return url, nil
@@ -39,7 +39,7 @@ func (m *MockURLRepository) FindByID(id uuid.UUID) (*domain.URL, error) {
 	}
 	return nil, nil
 }
-func (m *MockURLRepository) DeleteByOriginalURL(originalURL string) error {
+func (m *MockRepository) DeleteByOriginalURL(originalURL string) error {
 	for _, url := range m.urls {
 		if url.OriginalURL == originalURL {
 			delete(m.urls, url.ShortURL)
@@ -48,7 +48,7 @@ func (m *MockURLRepository) DeleteByOriginalURL(originalURL string) error {
 	}
 	return domain.ErrURLNotFound
 }
-func (m *MockURLRepository) DeleteByShortURL(shortURL string) error {
+func (m *MockRepository) DeleteByShortURL(shortURL string) error {
 	_, ok := m.urls[shortURL]
 	if !ok {
 		return domain.ErrURLNotFound
@@ -56,7 +56,7 @@ func (m *MockURLRepository) DeleteByShortURL(shortURL string) error {
 	delete(m.urls, shortURL)
 	return nil
 }
-func (m *MockURLRepository) DeleteByID(id uuid.UUID) error {
+func (m *MockRepository) DeleteByID(id uuid.UUID) error {
 	for _, url := range m.urls {
 		if url.ID == id {
 			delete(m.urls, url.ShortURL)

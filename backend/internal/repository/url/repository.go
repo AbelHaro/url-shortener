@@ -5,7 +5,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type URLRepository interface {
+type Repository interface {
 	Store(url *domain.URL) error
 	FindByOriginalURL(originalURL string) (*domain.URL, error)
 	FindByShortURL(shortURL string) (*domain.URL, error)

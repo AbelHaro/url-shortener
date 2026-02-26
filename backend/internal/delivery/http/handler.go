@@ -15,10 +15,10 @@ import (
 )
 
 type URLHandler struct {
-	service *url.URLService
+	service *url.Service
 }
 
-func NewURLHandler(svc *url.URLService) *URLHandler {
+func NewURLHandler(svc *url.Service) *URLHandler {
 	return &URLHandler{service: svc}
 }
 
