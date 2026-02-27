@@ -44,7 +44,7 @@ func TestURLHandler_Create(t *testing.T) {
 	}{
 		{
 			name:       "valid url",
-			body:       map[string]string{"long_url": "https://google.com"},
+			body:       map[string]string{"original_url": "https://google.com"},
 			wantStatus: http.StatusCreated,
 		},
 		{

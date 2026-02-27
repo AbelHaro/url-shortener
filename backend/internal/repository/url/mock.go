@@ -9,13 +9,21 @@ type MockRepository struct {
 	urls map[string]*domain.URL
 }
 
-func NewMockRepository() *MockRepository {
+func NewMockRepository() Repository {
 	return &MockRepository{urls: make(map[string]*domain.URL)}
 }
 
-func (m *MockRepository) Store(url *domain.URL) error {
+func (m *MockRepository) Store(url *domain.URL) (*domain.URL, error) {
+	for _, existing := range m.urls {
+		if existing.OriginalURL == url.OriginalURL {
+			return existing, nil
+		}
+	}
+	if url.ID == uuid.Nil {
+		url.ID = uuid.New()
+	}
 	m.urls[url.ShortURL] = url
-	return nil
+	return url, nil
 }
 func (m *MockRepository) FindByOriginalURL(originalURL string) (*domain.URL, error) {
 	for _, url := range m.urls {

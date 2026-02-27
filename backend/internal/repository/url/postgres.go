@@ -7,6 +7,7 @@ import (
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PostgresRepository struct {
@@ -17,10 +18,26 @@ func NewPostgresRepository(db *gorm.DB) Repository {
 	return &PostgresRepository{db: db}
 }
 
-func (repo PostgresRepository) Store(url *domain.URL) error {
+func (repo PostgresRepository) Store(url *domain.URL) (*domain.URL, error) {
 	ctx := context.Background()
-	return gorm.G[domain.URL](repo.db).Create(ctx, url)
 
+	err := repo.db.
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "original_url"}},
+			DoNothing: true,
+		}).
+		Create(url).Error
+
+	if err != nil {
+		return nil, domain.ErrInternal
+	}
+
+	storedUrl, err := gorm.G[domain.URL](repo.db).Where("original_url = ?", url.OriginalURL).First(ctx)
+	if err != nil {
+		return nil, domain.ErrInternal
+	}
+
+	return &storedUrl, nil
 }
 
 func (repo PostgresRepository) FindByOriginalURL(originalURL string) (*domain.URL, error) {

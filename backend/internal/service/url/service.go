@@ -28,14 +28,11 @@ func (svc *Service) Store(originalURL string) (*domain.URL, error) {
 		return nil, err
 	}
 
-	existing, err := svc.repo.FindByOriginalURL(originalURL)
-	if err != nil && errors.Is(err, domain.ErrInternal) {
-		return nil, err
-	}
-
-	if existing != nil {
-		return existing, nil
-	}
+	// Note: We don't check for existing URL here to avoid race conditions.
+	// Tradeoff: If the URL already exists in the database, a hash will be
+	// consumed from the counter but the existing URL will be returned.
+	// This is acceptable because duplicate submissions are rare and we
+	// prioritize avoiding the query + race condition at the service layer.
 
 	shortURL, err := svc.counterService.GenerateShortHash()
 	if err != nil {
@@ -43,16 +40,16 @@ func (svc *Service) Store(originalURL string) (*domain.URL, error) {
 	}
 
 	urlToInsert := &domain.URL{
-		ID:          uuid.New(),
 		OriginalURL: originalURL,
 		ShortURL:    shortURL,
 	}
 
-	if err := svc.repo.Store(urlToInsert); err != nil {
+	urlInserted, err := svc.repo.Store(urlToInsert)
+
+	if err != nil {
 		return nil, domain.ErrInternal
 	}
-
-	return urlToInsert, nil
+	return urlInserted, nil
 }
 
 func (svc *Service) FindByShortURL(shortURL string) (*domain.URL, error) {
