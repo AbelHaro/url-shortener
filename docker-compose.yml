@@ -7,16 +7,16 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=${DB_NAME}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     networks:
       - app-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
-      timeout: 5s
+      timeout: 3s
       retries: 5
-      start_period: 10s
+      start_period: 20s
 
   backend:
     image: ${DOCKERHUB_USERNAME}/url-shortener-backend:${TAG:-latest}
@@ -39,7 +39,7 @@ services:
         - "traefik.http.services.backend.loadbalancer.server.port=8080"
     depends_on:
       db:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
 
   frontend:
@@ -61,6 +61,3 @@ services:
 networks:
   app-network:
     driver: bridge
-
-volumes:
-  pgdata:
