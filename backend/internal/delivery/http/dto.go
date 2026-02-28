@@ -1,7 +1,7 @@
 package http
 
 type CreateShortenRequest struct {
-	LongURL string `json:"original_url" binding:"required"`
+	OriginalUrl string `json:"original_url" binding:"required"`
 }
 
 type SearchByOriginalURLRequest struct {

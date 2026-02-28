@@ -48,7 +48,7 @@ func TestService_Store(t *testing.T) {
 	}
 }
 
-func TestService_FindByShortURL(t *testing.T) {
+func TestService_FindByShortCode(t *testing.T) {
 	svc, err := provideService()
 
 	if err != nil {
@@ -76,14 +76,14 @@ func TestService_FindByShortURL(t *testing.T) {
 				return
 			}
 
-			urlFound, err := svc.FindByShortURL(urlInserted.ShortURL)
+			urlFound, err := svc.FindByShortCode(urlInserted.ShortCode)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Service.FindByShortURL() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Service.FindByShortCode() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			if urlFound != urlInserted {
-				t.Errorf("Service.FindByShortURL() = %v, want %v", urlFound, urlInserted)
+				t.Errorf("Service.FindByShortCode() = %v, want %v", urlFound, urlInserted)
 			}
 		})
 	}
@@ -242,7 +242,7 @@ func TestService_DeleteByOriginalURL(t *testing.T) {
 	}
 }
 
-func TestService_DeleteByShortURL(t *testing.T) {
+func TestService_DeleteByShortCode(t *testing.T) {
 	svc, err := provideService()
 	if err != nil {
 		t.Fatalf("provideService() error = %v", err)
@@ -251,7 +251,7 @@ func TestService_DeleteByShortURL(t *testing.T) {
 	tests := []struct {
 		name        string
 		originalURL string
-		shortURL    string
+		shortCode   string
 		wantErr     bool
 	}{
 		{"Stored url is deleted", "https://google.com", "", false},
@@ -265,11 +265,11 @@ func TestService_DeleteByShortURL(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Service.Store() error = %v", err)
 				}
-				tt.shortURL = urlInserted.ShortURL
+				tt.shortCode = urlInserted.ShortCode
 			}
-			err := svc.DeleteByShortURL(tt.shortURL)
+			err := svc.DeleteByShortCode(tt.shortCode)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Service.DeleteByShortURL() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Service.DeleteByShortCode() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

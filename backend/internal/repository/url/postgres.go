@@ -55,10 +55,10 @@ func (repo PostgresRepository) FindByOriginalURL(originalURL string) (*domain.UR
 	return &url, nil
 }
 
-func (repo PostgresRepository) FindByShortURL(shortURL string) (*domain.URL, error) {
+func (repo PostgresRepository) FindByShortCode(shortCode string) (*domain.URL, error) {
 	ctx := context.Background()
 
-	url, err := gorm.G[domain.URL](repo.db).Where("short_url = ?", shortURL).First(ctx)
+	url, err := gorm.G[domain.URL](repo.db).Where("short_code = ?", shortCode).First(ctx)
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -103,10 +103,10 @@ func (repo PostgresRepository) DeleteByOriginalURL(originalURL string) error {
 	return nil
 }
 
-func (repo PostgresRepository) DeleteByShortURL(shortURL string) error {
+func (repo PostgresRepository) DeleteByShortCode(shortCode string) error {
 	ctx := context.Background()
 
-	rowsAffected, err := gorm.G[domain.URL](repo.db).Where("short_url = ?", shortURL).Delete(ctx)
+	rowsAffected, err := gorm.G[domain.URL](repo.db).Where("short_code = ?", shortCode).Delete(ctx)
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

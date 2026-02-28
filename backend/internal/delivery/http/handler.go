@@ -1,3 +1,4 @@
+// Package http
 // @title           URL Shortener API
 // @version         1.0
 // @description     API for shortening URLs
@@ -7,6 +8,7 @@ package http
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
@@ -26,8 +28,8 @@ func NewURLHandler(svc *url.Service) *URLHandler {
 // @Summary Shorten a URL
 // @Description Create a shortened URL from a long URL
 // @Tags URLs
-// @Accept json
-// @Produce json
+// @Accept JSON
+// @Produce JSON
 // @Param request body CreateShortenRequest true "Request body"
 // @Success 201 {object} domain.URL
 // @Failure 400 {object} ErrorResponse
@@ -36,17 +38,18 @@ func (h *URLHandler) Create(c *gin.Context) {
 	var req CreateShortenRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Println(err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
 		return
 	}
 
-	url, err := h.service.Store(req.LongURL)
+	urlCreated, err := h.service.Store(req.OriginalUrl)
 	if err != nil {
 		h.handleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, url)
+	c.JSON(http.StatusCreated, urlCreated)
 }
 
 // Redirect to original URL
@@ -59,20 +62,20 @@ func (h *URLHandler) Create(c *gin.Context) {
 func (h *URLHandler) Redirect(c *gin.Context) {
 	shortURL := c.Param("shortURL")
 
-	url, err := h.service.FindByShortURL(shortURL)
+	urlFound, err := h.service.FindByShortCode(shortURL)
 	if err != nil {
 		h.handleError(c, err)
 		return
 	}
 
-	c.Redirect(http.StatusMovedPermanently, url.OriginalURL)
+	c.Redirect(http.StatusMovedPermanently, urlFound.OriginalURL)
 }
 
-// Find URL by ID
+// FindByID Find URL by ID
 // @Summary Get URL by ID
 // @Description Retrieve a URL by its ID
 // @Tags URLs
-// @Produce json
+// @Produce JSON
 // @Param id path string true "URL ID"
 // @Success 200 {object} domain.URL
 // @Failure 404 {object} ErrorResponse
@@ -80,16 +83,37 @@ func (h *URLHandler) Redirect(c *gin.Context) {
 func (h *URLHandler) FindByID(c *gin.Context) {
 	id := c.Param("id")
 
-	url, err := h.service.FindByID(id)
+	urlFound, err := h.service.FindByID(id)
 	if err != nil {
 		h.handleError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, url)
+	c.JSON(http.StatusOK, urlFound)
 }
 
-// Delete URL by ID
+// FindByShortCode Find URL by short code
+// @Summary Get URL by short code
+// @Description Retrieve a URL by its short code
+// @Tags URLs
+// @Produce JSON
+// @Param shortCode path string true "Short Code"
+// @Success 200 {object} domain.URL
+// @Failure 404 {object} ErrorResponse
+// @Router /urls/short/{shortCode} [get]
+func (h *URLHandler) FindByShortCode(c *gin.Context) {
+	shortCode := c.Param("shortCode")
+
+	urlFound, err := h.service.FindByShortCode(shortCode)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, urlFound)
+}
+
+// DeleteByID Delete URL by ID
 // @Summary Delete URL
 // @Description Delete a URL by its ID
 // @Tags URLs
@@ -109,7 +133,7 @@ func (h *URLHandler) DeleteByID(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// Find URL by original URL
+// FindByOriginalURL Find URL by original URL
 // @Summary Search URL by original URL
 // @Description Find a shortened URL by its original URL
 // @Tags URLs
@@ -127,25 +151,25 @@ func (h *URLHandler) FindByOriginalURL(c *gin.Context) {
 		return
 	}
 
-	url, err := h.service.FindByOriginalURL(req.URL)
+	urlFound, err := h.service.FindByOriginalURL(req.URL)
 	if err != nil {
 		h.handleError(c, err)
 		return
 	}
 
-	if url == nil {
+	if urlFound == nil {
 		c.JSON(http.StatusNotFound, ErrorResponse{Error: "url not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, url)
+	c.JSON(http.StatusOK, urlFound)
 }
 
 // Health check
 // @Summary Health check
 // @Description Returns the health status of the API
 // @Tags Health
-// @Produce json
+// @Produce JSON
 // @Success 200 {object} HealthResponse
 // @Router /health [get]
 func (h *URLHandler) Health(c *gin.Context) {

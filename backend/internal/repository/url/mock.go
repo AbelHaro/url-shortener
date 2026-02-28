@@ -22,7 +22,7 @@ func (m *MockRepository) Store(url *domain.URL) (*domain.URL, error) {
 	if url.ID == uuid.Nil {
 		url.ID = uuid.New()
 	}
-	m.urls[url.ShortURL] = url
+	m.urls[url.ShortCode] = url
 	return url, nil
 }
 func (m *MockRepository) FindByOriginalURL(originalURL string) (*domain.URL, error) {
@@ -33,8 +33,8 @@ func (m *MockRepository) FindByOriginalURL(originalURL string) (*domain.URL, err
 	}
 	return nil, nil
 }
-func (m *MockRepository) FindByShortURL(shortURL string) (*domain.URL, error) {
-	if url, ok := m.urls[shortURL]; ok {
+func (m *MockRepository) FindByShortCode(shortCode string) (*domain.URL, error) {
+	if url, ok := m.urls[shortCode]; ok {
 		return url, nil
 	}
 	return nil, nil
@@ -50,24 +50,24 @@ func (m *MockRepository) FindByID(id uuid.UUID) (*domain.URL, error) {
 func (m *MockRepository) DeleteByOriginalURL(originalURL string) error {
 	for _, url := range m.urls {
 		if url.OriginalURL == originalURL {
-			delete(m.urls, url.ShortURL)
+			delete(m.urls, url.ShortCode)
 			return nil
 		}
 	}
 	return domain.ErrURLNotFound
 }
-func (m *MockRepository) DeleteByShortURL(shortURL string) error {
-	_, ok := m.urls[shortURL]
+func (m *MockRepository) DeleteByShortCode(shortCode string) error {
+	_, ok := m.urls[shortCode]
 	if !ok {
 		return domain.ErrURLNotFound
 	}
-	delete(m.urls, shortURL)
+	delete(m.urls, shortCode)
 	return nil
 }
 func (m *MockRepository) DeleteByID(id uuid.UUID) error {
 	for _, url := range m.urls {
 		if url.ID == id {
-			delete(m.urls, url.ShortURL)
+			delete(m.urls, url.ShortCode)
 			return nil
 		}
 	}

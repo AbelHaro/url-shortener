@@ -88,17 +88,17 @@ func TestURLHandler_Redirect(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		shortURL   string
+		shortCode  string
 		wantStatus int
 	}{
 		{
 			name:       "existing short URL",
-			shortURL:   urlStored.ShortURL,
+			shortCode:  urlStored.ShortCode,
 			wantStatus: http.StatusMovedPermanently,
 		},
 		{
 			name:       "not found short URL",
-			shortURL:   "notfound",
+			shortCode:  "notfound",
 			wantStatus: http.StatusNotFound,
 		},
 	}
@@ -108,7 +108,7 @@ func TestURLHandler_Redirect(t *testing.T) {
 			router := gin.New()
 			router.GET("/:shortURL", h.Redirect)
 
-			req, _ := http.NewRequest("GET", "/"+tt.shortURL, nil)
+			req, _ := http.NewRequest("GET", "/"+tt.shortCode, nil)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 

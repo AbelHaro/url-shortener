@@ -34,14 +34,14 @@ func (svc *Service) Store(originalURL string) (*domain.URL, error) {
 	// This is acceptable because duplicate submissions are rare and we
 	// prioritize avoiding the query + race condition at the service layer.
 
-	shortURL, err := svc.counterService.GenerateShortHash()
+	shortCode, err := svc.counterService.GenerateShortHash()
 	if err != nil {
 		return nil, domain.ErrInternal
 	}
 
 	urlToInsert := &domain.URL{
 		OriginalURL: originalURL,
-		ShortURL:    shortURL,
+		ShortCode:   shortCode,
 	}
 
 	urlInserted, err := svc.repo.Store(urlToInsert)
@@ -52,8 +52,8 @@ func (svc *Service) Store(originalURL string) (*domain.URL, error) {
 	return urlInserted, nil
 }
 
-func (svc *Service) FindByShortURL(shortURL string) (*domain.URL, error) {
-	urlFound, err := svc.repo.FindByShortURL(shortURL)
+func (svc *Service) FindByShortCode(shortCode string) (*domain.URL, error) {
+	urlFound, err := svc.repo.FindByShortCode(shortCode)
 	if err != nil {
 		return nil, err
 	}
@@ -122,13 +122,13 @@ func (svc *Service) DeleteByOriginalURL(originalURL string) error {
 	return nil
 }
 
-func (svc *Service) DeleteByShortURL(shortURL string) error {
-	_, err := svc.repo.FindByShortURL(shortURL)
+func (svc *Service) DeleteByShortCode(shortCode string) error {
+	_, err := svc.repo.FindByShortCode(shortCode)
 	if err != nil {
 		return domain.ErrURLNotFound
 	}
 
-	err = svc.repo.DeleteByShortURL(shortURL)
+	err = svc.repo.DeleteByShortCode(shortCode)
 	if err != nil {
 		return domain.ErrInternal
 	}

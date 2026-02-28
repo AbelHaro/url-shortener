@@ -53,8 +53,8 @@ This file contains guidelines and commands for agentic coding agents working in 
 ### Naming Conventions
 - Use PascalCase for exported types, functions, and constants
 - Use camelCase for unexported identifiers
-- Repository interfaces: `Repository` with methods like `Store()`, `FindByShortURL()`
-- Service structs: `Service` with methods like `Store()`, `FindByShortURL()`
+- Repository interfaces: `Repository` with methods like `Store()`, `FindByShortCode()`
+- Service structs: `Service` with methods like `Store()`, `FindByShortCode()`
 - Error variables in domain: `ErrURLNotFound`, `ErrInvalidURL`
 
 ### Error Handling
