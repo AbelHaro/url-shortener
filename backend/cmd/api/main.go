@@ -10,14 +10,19 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/AbelHaro/url-shortener/backend/server"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	godotenv.Load()
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("Error loading .env file")
+	}
 	app := server.NewApp()
-	err := app.Run(":8080")
+	err = app.Run(":8080")
 	if err != nil {
 		panic(err)
 	}

@@ -9,7 +9,7 @@ services:
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     networks:
-      - app-network
+      - dokploy-network
     restart: unless-stopped
 
   backend:
@@ -21,16 +21,16 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
-      - PORT=8080
+
+    expose:
+      - 8080
     networks:
-      - app-network
-    deploy:
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.backend.rule=Host(`api.url-shortener.abelharo.me`)"
-        - "traefik.http.routers.backend.entrypoints=websecure"
-        - "traefik.http.routers.backend.tls.certresolver=le"
-        - "traefik.http.services.backend.loadbalancer.server.port=8080"
+      - dokploy-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.backend.rule=Host(`api.url-shortener.abelharo.me`)
+      - traefik.http.routers.backend.entrypoints=web
+      - traefik.http.services.backend.loadbalancer.server.port=8080
     depends_on:
       db:
         condition: service_started
@@ -39,23 +39,20 @@ services:
   frontend:
     image: ${DOCKERHUB_USERNAME}/url-shortener-frontend:${TAG:-latest}
     container_name: url-shortener-frontend
+    expose:
+      - 80
     networks:
-      - app-network
+      - dokploy-network
     deploy:
       labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.frontend.rule=Host(`url-shortener.abelharo.me`)"
-        - "traefik.http.routers.frontend.entrypoints=websecure"
-        - "traefik.http.routers.frontend.tls.certresolver=le"
-        - "traefik.http.services.frontend.loadbalancer.server.port=80"
-        - "traefik.http.routers.api.rule=Host(`url-shortener.abelharo.me`) && PathPrefix(`/api`)"
-        - "traefik.http.routers.api.entrypoints=websecure"
-        - "traefik.http.routers.api.tls.certresolver=le"
-        - "traefik.http.services.api.loadbalancer.server.port=8080"
+        - traefik.enable=true
+        - traefik.http.routers.frontend.rule=Host(`url-shortener.abelharo.me`)
+        - traefik.http.routers.frontend.entrypoints=web
+        - traefik.http.services.frontend.loadbalancer.server.port=80
     depends_on:
       - backend
     restart: unless-stopped
 
 networks:
-  app-network:
-    driver: bridge
+  dokploy-network:
+    external: true
