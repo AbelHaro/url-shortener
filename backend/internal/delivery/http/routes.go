@@ -19,7 +19,7 @@ func SetupRoutes(r *gin.Engine, h *URLHandler) {
 	docs.SwaggerInfo.Schemes = []string{"http"}
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"}, // Allow vite frontend on development
+		AllowOrigins:     []string{"http://localhost:5173", "https://url-shortener.abelharo.me"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},

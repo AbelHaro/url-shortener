@@ -8,6 +8,8 @@ services:
       - POSTGRES_DB=${DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d postgres"]
@@ -25,6 +27,8 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - PORT=8080
+    networks:
+      - app-network
     deploy:
       labels:
         - "traefik.enable=true"
@@ -40,6 +44,8 @@ services:
   frontend:
     image: ${DOCKERHUB_USERNAME}/url-shortener-frontend:${TAG:-latest}
     container_name: url-shortener-frontend
+    networks:
+      - app-network
     deploy:
       labels:
         - "traefik.enable=true"
@@ -47,10 +53,13 @@ services:
         - "traefik.http.routers.frontend.entrypoints=websecure"
         - "traefik.http.routers.frontend.tls.certresolver=le"
         - "traefik.http.services.frontend.loadbalancer.server.port=80"
-        - "traefik.http.middlewares.frontend-compress.compress=true"
     depends_on:
       - backend
     restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   pgdata:
