@@ -15,12 +15,9 @@ import (
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		panic("Error loading .env file")
-	}
+	godotenv.Load()
 	app := server.NewApp()
-	err = app.Run(":8080")
+	err := app.Run(":8080")
 	if err != nil {
 		panic(err)
 	}

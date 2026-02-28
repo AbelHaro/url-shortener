@@ -7,16 +7,10 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=${DB_NAME}
     volumes:
-      - ./data/postgres:/var/lib/postgresql
+      - ./data/postgres:/var/lib/postgresql/data
     networks:
       - app-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 20s
 
   backend:
     image: ${DOCKERHUB_USERNAME}/url-shortener-backend:${TAG:-latest}
@@ -54,6 +48,10 @@ services:
         - "traefik.http.routers.frontend.entrypoints=websecure"
         - "traefik.http.routers.frontend.tls.certresolver=le"
         - "traefik.http.services.frontend.loadbalancer.server.port=80"
+        - "traefik.http.routers.api.rule=Host(`url-shortener.abelharo.me`) && PathPrefix(`/api`)"
+        - "traefik.http.routers.api.entrypoints=websecure"
+        - "traefik.http.routers.api.tls.certresolver=le"
+        - "traefik.http.services.api.loadbalancer.server.port=8080"
     depends_on:
       - backend
     restart: unless-stopped
