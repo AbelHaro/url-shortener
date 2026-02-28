@@ -1,22 +1,63 @@
-
 services:
   db:
-    image : postgres:18
+    image: postgres:18
     container_name: url-shortener-postgres-db
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=${DB_NAME}
     volumes:
-      - pgdata:/var/lib/postgresql/
+      - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d postgres"]
       interval: 30s
       timeout: 10s
       retries: 5
+
+  backend:
+    image: ${DOCKERHUB_USERNAME}/url-shortener-backend:${TAG:-latest}
+    container_name: url-shortener-backend
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - PORT=8080
+    ports:
+      - "8080:8080"
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.backend.rule=Host(`api.url-shortener.abelharo.me`)"
+        - "traefik.http.routers.backend.entrypoints=websecure"
+        - "traefik.http.routers.backend.tls.certresolver=le"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: ${DOCKERHUB_USERNAME}/url-shortener-frontend:${TAG:-latest}
+    container_name: url-shortener-frontend
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_BASE_URL=${FRONTEND_API_URL:-http://localhost:8080}
+    ports:
+      - "80:80"
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.frontend.rule=Host(`url-shortener.abelharo.me`)"
+        - "traefik.http.routers.frontend.entrypoints=websecure"
+        - "traefik.http.routers.frontend.tls.certresolver=le"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   pgdata:
