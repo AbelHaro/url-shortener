@@ -8,8 +8,6 @@ services:
       - POSTGRES_DB=${DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d postgres"]
@@ -27,14 +25,13 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - PORT=8080
-    ports:
-      - "8080:8080"
     deploy:
       labels:
         - "traefik.enable=true"
         - "traefik.http.routers.backend.rule=Host(`api.url-shortener.abelharo.me`)"
         - "traefik.http.routers.backend.entrypoints=websecure"
         - "traefik.http.routers.backend.tls.certresolver=le"
+        - "traefik.http.services.backend.loadbalancer.server.port=8080"
     depends_on:
       db:
         condition: service_healthy
@@ -43,18 +40,14 @@ services:
   frontend:
     image: ${DOCKERHUB_USERNAME}/url-shortener-frontend:${TAG:-latest}
     container_name: url-shortener-frontend
-    build:
-      context: ./frontend
-      args:
-        - VITE_API_BASE_URL=${FRONTEND_API_URL:-http://localhost:8080}
-    ports:
-      - "80:80"
     deploy:
       labels:
         - "traefik.enable=true"
         - "traefik.http.routers.frontend.rule=Host(`url-shortener.abelharo.me`)"
         - "traefik.http.routers.frontend.entrypoints=websecure"
         - "traefik.http.routers.frontend.tls.certresolver=le"
+        - "traefik.http.services.frontend.loadbalancer.server.port=80"
+        - "traefik.http.middlewares.frontend-compress.compress=true"
     depends_on:
       - backend
     restart: unless-stopped
