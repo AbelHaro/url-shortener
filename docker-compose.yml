@@ -7,7 +7,7 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=${DB_NAME}
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql
     networks:
       - app-network
     restart: unless-stopped
