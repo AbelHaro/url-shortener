@@ -23,11 +23,4 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost/health || exit 1
 
-LABEL "traefik.enable=true" \
-      "traefik.http.routers.frontend.rule=Host('url-shortener.abelharo.me')" \
-      "traefik.http.routers.frontend.entrypoints=websecure" \
-      "traefik.http.routers.frontend.tls.certresolver=le" \
-      "traefik.http.services.frontend.loadbalancer.server.port=80" \
-      "traefik.http.middlewares.frontend-compress.compress=true"
-
 CMD ["nginx", "-g", "daemon off;"]
