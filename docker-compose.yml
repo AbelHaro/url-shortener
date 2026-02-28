@@ -12,10 +12,11 @@ services:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d postgres"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
       retries: 5
+      start_period: 10s
 
   backend:
     image: ${DOCKERHUB_USERNAME}/url-shortener-backend:${TAG:-latest}
