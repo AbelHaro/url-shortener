@@ -22,6 +22,8 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
+      - GIN_MODE=release
+      - TRUSTED_PROXIES=0.0.0.0/0
     expose:
       - 8080
     networks:
@@ -29,7 +31,8 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.backend.rule=Host(`api-url-shortener.abelharo.me`)
-      - traefik.http.routers.backend.entrypoints=web
+      - traefik.http.routers.backend.entrypoints=websecure
+      - traefik.http.routers.backend.tls.certresolver=letsencrypt
       - traefik.http.services.backend.loadbalancer.server.port=8080
     depends_on:
       db:
@@ -47,7 +50,8 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.frontend.rule=Host(`url-shortener.abelharo.me`)
-      - traefik.http.routers.frontend.entrypoints=web
+      - traefik.http.routers.frontend.entrypoints=websecure
+      - traefik.http.routers.frontend.tls.certresolver=letsencrypt
       - traefik.http.services.frontend.loadbalancer.server.port=80
     depends_on:
       - backend

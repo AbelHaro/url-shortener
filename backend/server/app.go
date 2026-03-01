@@ -2,6 +2,8 @@ package server
 
 import (
 	"log"
+	"os"
+	"strings"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http"
 	"github.com/AbelHaro/url-shortener/backend/internal/infrastructure/database"
@@ -41,6 +43,13 @@ func NewApp() *App {
 	}
 
 	router := gin.Default()
+
+	if proxies := os.Getenv("TRUSTED_PROXIES"); proxies != "" {
+		if err := router.SetTrustedProxies(strings.Split(proxies, ",")); err != nil {
+			log.Fatalf("Failed to set trusted proxies: %v", err)
+		}
+	}
+
 	handler := http.NewURLHandler(svc)
 	http.SetupRoutes(router, handler)
 
