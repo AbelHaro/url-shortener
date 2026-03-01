@@ -14,6 +14,7 @@ services:
 
   backend:
     image: abelharo2/url-shortener-backend:latest
+    pull_policy: always
     container_name: url-shortener-backend
     environment:
       - DB_HOST=db
@@ -37,6 +38,7 @@ services:
 
   frontend:
     image: abelharo2/url-shortener-frontend:latest
+    pull_policy: always
     container_name: url-shortener-frontend
     expose:
       - 80
