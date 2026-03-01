@@ -21,14 +21,13 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
-
     expose:
       - 8080
     networks:
       - dokploy-network
     labels:
       - traefik.enable=true
-      - traefik.http.routers.backend.rule=Host(`api.url-shortener.abelharo.me`)
+      - traefik.http.routers.backend.rule=Host(`api-url-shortener.abelharo.me`)
       - traefik.http.routers.backend.entrypoints=web
       - traefik.http.services.backend.loadbalancer.server.port=8080
     depends_on:
@@ -43,12 +42,11 @@ services:
       - 80
     networks:
       - dokploy-network
-    deploy:
-      labels:
-        - traefik.enable=true
-        - traefik.http.routers.frontend.rule=Host(`url-shortener.abelharo.me`)
-        - traefik.http.routers.frontend.entrypoints=web
-        - traefik.http.services.frontend.loadbalancer.server.port=80
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=Host(`url-shortener.abelharo.me`)
+      - traefik.http.routers.frontend.entrypoints=web
+      - traefik.http.services.frontend.loadbalancer.server.port=80
     depends_on:
       - backend
     restart: unless-stopped
