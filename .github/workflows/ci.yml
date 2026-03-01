@@ -160,4 +160,9 @@ jobs:
     steps:
       - name: Trigger Dokploy deployment
         run: |
-          curl -X POST "${{ secrets.DOKPLOY_URL }}/api/deploy/compose/${{ secrets.DOKPLOY_COMPOSE_ID }}"
+          curl -X 'POST' \
+            '${{ secrets.DOKPLOY_URL }}/api/compose.deploy' \
+            -H 'accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H 'x-api-key: ${{ secrets.DOKPLOY_API_KEY }}' \
+            -d '{"composeId": "${{ secrets.DOKPLOY_APP_ID }}"}'
