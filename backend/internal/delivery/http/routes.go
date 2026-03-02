@@ -13,8 +13,8 @@ import (
 )
 
 var allowedOrigins = []string{
-	"http://localhost:5173",
-	"https://url-shortener.abelharo.me",
+	"http://localhost:5173/",
+	"https://url-shortener.abelharo.me/",
 }
 
 func SetupRoutes(r *gin.Engine, h *URLHandler) {

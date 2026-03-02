@@ -109,7 +109,7 @@ func TestURLHandler_Redirect(t *testing.T) {
 			router.GET("/:shortURL", h.Redirect)
 
 			req, _ := http.NewRequest("GET", "/"+tt.shortCode, nil)
-			req.Header.Set("Referer", "http://localhost:5173")
+			req.Header.Set("Referer", "http://localhost:5173/")
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
