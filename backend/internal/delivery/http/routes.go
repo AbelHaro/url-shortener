@@ -2,7 +2,7 @@ package http
 
 import (
 	"fmt"
-	"strings"
+	"net/url"
 	"time"
 
 	"github.com/AbelHaro/url-shortener/backend/docs"
@@ -70,14 +70,15 @@ func refererMiddleware() gin.HandlerFunc {
 		}
 
 		valid := false
-		refererHost := strings.TrimSuffix(strings.TrimPrefix(referer, "http://"), strings.TrimPrefix(referer, "https://"))
-		refererHost = strings.Split(refererHost, "/")[0]
-
-		for _, origin := range allowedOrigins {
-			originHost := strings.TrimSuffix(strings.TrimPrefix(origin, "http://"), strings.TrimPrefix(origin, "https://"))
-			if refererHost == originHost {
-				valid = true
-				break
+		refererURL, err := url.Parse(referer)
+		if err == nil {
+			refererHost := refererURL.Host
+			for _, origin := range allowedOrigins {
+				originURL, err := url.Parse(origin)
+				if err == nil && refererHost == originURL.Host {
+					valid = true
+					break
+				}
 			}
 		}
 
