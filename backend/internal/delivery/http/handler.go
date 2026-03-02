@@ -10,11 +10,17 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
 	"github.com/AbelHaro/url-shortener/backend/internal/service/url"
 	"github.com/gin-gonic/gin"
 )
+
+var allowedOrigins = []string{
+	"http://localhost:5173",
+	"https://url-shortener.abelharo.me",
+}
 
 type URLHandler struct {
 	service *url.Service
@@ -61,6 +67,31 @@ func (h *URLHandler) Create(c *gin.Context) {
 // @Router /{shortURL} [get]
 func (h *URLHandler) Redirect(c *gin.Context) {
 	shortURL := c.Param("shortURL")
+
+	if !gin.IsDebugging() {
+		referer := c.GetHeader("Referer")
+		if referer == "" {
+			c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "unauthorized access"})
+			return
+		}
+
+		valid := false
+		refererHost := strings.TrimSuffix(strings.TrimPrefix(referer, "http://"), strings.TrimPrefix(referer, "https://"))
+		refererHost = strings.Split(refererHost, "/")[0]
+
+		for _, origin := range allowedOrigins {
+			originHost := strings.TrimSuffix(strings.TrimPrefix(origin, "http://"), strings.TrimPrefix(origin, "https://"))
+			if refererHost == originHost {
+				valid = true
+				break
+			}
+		}
+
+		if !valid {
+			c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "unauthorized access"})
+			return
+		}
+	}
 
 	urlFound, err := h.service.FindByShortCode(shortURL)
 	if err != nil {

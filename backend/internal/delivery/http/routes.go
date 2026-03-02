@@ -1,6 +1,7 @@
 package http
 
 import (
+	"strings"
 	"time"
 
 	"github.com/AbelHaro/url-shortener/backend/docs"
@@ -27,14 +28,17 @@ func SetupRoutes(r *gin.Engine, h *URLHandler) {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(
-		swaggerFiles.NewHandler(),
-		ginSwagger.URL("/swagger/doc.json"),
-	))
-
 	r.GET("/health", h.Health)
 
+	if gin.IsDebugging() {
+		r.GET("/swagger/*any", ginSwagger.WrapHandler(
+			swaggerFiles.NewHandler(),
+			ginSwagger.URL("/swagger/doc.json"),
+		))
+	}
+
 	api := r.Group("/api/v1")
+	api.Use(refererMiddleware())
 	{
 		api.POST("/shorten", h.Create)
 		api.GET("/urls/short/:shortCode", h.FindByShortCode)
@@ -44,4 +48,38 @@ func SetupRoutes(r *gin.Engine, h *URLHandler) {
 		api.GET("/:shortURL", h.Redirect)
 	}
 
+}
+
+func refererMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if gin.IsDebugging() {
+			c.Next()
+			return
+		}
+
+		referer := c.GetHeader("Referer")
+		if referer == "" {
+			c.AbortWithStatusJSON(401, ErrorResponse{Error: "unauthorized access"})
+			return
+		}
+
+		valid := false
+		refererHost := strings.TrimSuffix(strings.TrimPrefix(referer, "http://"), strings.TrimPrefix(referer, "https://"))
+		refererHost = strings.Split(refererHost, "/")[0]
+
+		for _, origin := range allowedOrigins {
+			originHost := strings.TrimSuffix(strings.TrimPrefix(origin, "http://"), strings.TrimPrefix(origin, "https://"))
+			if refererHost == originHost {
+				valid = true
+				break
+			}
+		}
+
+		if !valid {
+			c.AbortWithStatusJSON(401, ErrorResponse{Error: "unauthorized access"})
+			return
+		}
+
+		c.Next()
+	}
 }
