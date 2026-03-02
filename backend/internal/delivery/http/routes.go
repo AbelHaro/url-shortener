@@ -12,6 +12,11 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+var allowedOrigins = []string{
+	"http://localhost:5173",
+	"https://url-shortener.abelharo.me",
+}
+
 func SetupRoutes(r *gin.Engine, h *URLHandler) {
 	docs.SwaggerInfo.Title = "URL Shortener API"
 	docs.SwaggerInfo.Description = "API for shortening and managing URLs"
