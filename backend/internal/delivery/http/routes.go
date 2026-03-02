@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -8,7 +9,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
-	"github.com/swaggo/gin-swagger"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func SetupRoutes(r *gin.Engine, h *URLHandler) {
@@ -74,6 +75,8 @@ func refererMiddleware() gin.HandlerFunc {
 				break
 			}
 		}
+
+		fmt.Printf("Referer: %s, Valid: %t\n", referer, valid)
 
 		if !valid {
 			c.AbortWithStatusJSON(401, ErrorResponse{Error: "unauthorized access"})
