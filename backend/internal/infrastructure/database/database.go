@@ -56,6 +56,7 @@ func NewDB(cfg *Config) (*gorm.DB, error) {
 		&domain.RefreshToken{},
 		&domain.URL{},
 		&domain.Counter{},
+		&domain.URLStatistics{},
 	}
 
 	if err := db.AutoMigrate(entities...); err != nil {

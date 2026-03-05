@@ -29,10 +29,7 @@ func (svc *Service) Store(originalURL string) (*domain.URL, error) {
 	}
 
 	// Note: We don't check for existing URL here to avoid race conditions.
-	// Tradeoff: If the URL already exists in the database, a hash will be
-	// consumed from the counter but the existing URL will be returned.
-	// This is acceptable because duplicate submissions are rare and we
-	// prioritize avoiding the query + race condition at the service layer.
+	// Beacause the short code is generated based on a counter so it is the responsibility of the counter service to ensure that the same short code is not generated twice.
 
 	shortCode, err := svc.counterService.GenerateShortHash()
 	if err != nil {
