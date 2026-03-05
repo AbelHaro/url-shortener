@@ -37,10 +37,10 @@ func NewApp() *App {
 	}
 
 	svc := urlSvc.NewService(urlRepoInstance, counter)
-	err = svc.GenerateDevData()
-	if err != nil {
-		log.Fatalf("Failed to generate dev data: %v", err)
-	}
+	//err = svc.GenerateDevData()
+	//if err != nil {
+	//	log.Fatalf("Failed to generate dev data: %v", err)
+	//}
 
 	router := gin.Default()
 
