@@ -52,6 +52,8 @@ func NewDB(cfg *Config) (*gorm.DB, error) {
 
 	// Centralized entity registration for migrations
 	entities := []interface{}{
+		&domain.User{},
+		&domain.RefreshToken{},
 		&domain.URL{},
 		&domain.Counter{},
 	}
