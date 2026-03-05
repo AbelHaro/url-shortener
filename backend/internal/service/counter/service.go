@@ -1,8 +1,11 @@
 package counter
 
 import (
+	"encoding/binary"
 	"sync"
 	"sync/atomic"
+
+	"github.com/cyrildever/feistel"
 
 	counterRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/counter"
 )
@@ -10,14 +13,18 @@ import (
 const base62Chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 type Service struct {
-	mu      sync.RWMutex
-	counter int64
-	repo    counterRepo.Repository
+	mu       sync.RWMutex
+	counter  int64
+	repo     counterRepo.Repository
+	cipher   *feistel.Cipher
+	maxValue uint64
 }
 
 func NewService(repo counterRepo.Repository) (*Service, error) {
 	svc := &Service{
-		repo: repo,
+		repo:     repo,
+		cipher:   feistel.NewCipher("url-shortener-secret-key-2026", 12),
+		maxValue: 62 * 62 * 62 * 62 * 62 * 62 * 62,
 	}
 
 	hashCounter, err := repo.GetCounter()
@@ -39,7 +46,18 @@ func (svc *Service) NextBase62() (string, error) {
 		return "", err
 	}
 
-	return svc.ToBase62(newVal), nil
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, uint64(newVal))
+
+	encrypted, err := svc.cipher.Encrypt(string(buf))
+	if err != nil {
+		return "", err
+	}
+
+	encryptedBytes := []byte(encrypted)
+	result := binary.BigEndian.Uint64(encryptedBytes[:8]) % svc.maxValue
+
+	return svc.ToBase62(int64(result)), nil
 }
 
 func (svc *Service) ToBase62(n int64) string {
@@ -48,11 +66,11 @@ func (svc *Service) ToBase62(n int64) string {
 	}
 
 	var result []byte
-	length := len(base62Chars)
+	length := int64(len(base62Chars))
 
 	for n > 0 {
-		result = append([]byte{base62Chars[n%int64(length)]}, result...)
-		n /= int64(length)
+		result = append([]byte{base62Chars[n%length]}, result...)
+		n /= length
 	}
 
 	return string(result)
