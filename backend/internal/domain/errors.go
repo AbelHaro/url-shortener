@@ -12,4 +12,6 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrUserExists         = errors.New("user already exists")
 	ErrInvalidToken       = errors.New("invalid token")
+
+	ErrUrlStatisticsNotFound = errors.New("url statistics not found")
 )
