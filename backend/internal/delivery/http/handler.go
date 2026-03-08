@@ -28,8 +28,8 @@ func NewURLHandler(svc *url.Service) *URLHandler {
 // @Summary Shorten a URL
 // @Description Create a shortened URL from a long URL
 // @Tags URLs
-// @Accept JSON
-// @Produce JSON
+// @Accept json
+// @Produce json
 // @Param request body CreateShortenRequest true "Request body"
 // @Success 201 {object} domain.URL
 // @Failure 400 {object} ErrorResponse
@@ -75,7 +75,7 @@ func (h *URLHandler) Redirect(c *gin.Context) {
 // @Summary Get URL by ID
 // @Description Retrieve a URL by its ID
 // @Tags URLs
-// @Produce JSON
+// @Produce json
 // @Param id path string true "URL ID"
 // @Success 200 {object} domain.URL
 // @Failure 404 {object} ErrorResponse
@@ -96,7 +96,7 @@ func (h *URLHandler) FindByID(c *gin.Context) {
 // @Summary Get URL by short code
 // @Description Retrieve a URL by its short code
 // @Tags URLs
-// @Produce JSON
+// @Produce json
 // @Param shortCode path string true "Short Code"
 // @Success 200 {object} domain.URL
 // @Failure 404 {object} ErrorResponse
@@ -169,7 +169,7 @@ func (h *URLHandler) FindByOriginalURL(c *gin.Context) {
 // @Summary Health check
 // @Description Returns the health status of the API
 // @Tags Health
-// @Produce JSON
+// @Produce json
 // @Success 200 {object} HealthResponse
 // @Router /health [get]
 func (h *URLHandler) Health(c *gin.Context) {

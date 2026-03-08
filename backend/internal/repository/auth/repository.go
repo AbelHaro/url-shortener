@@ -2,14 +2,15 @@ package auth
 
 import (
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
-	"github.com/google/uuid"
 )
 
 type Repository interface {
 	CreateUser(user *domain.User) error
-	Authenticate(email, hashedPassword string) (*domain.RefreshToken, error)
-	ValidateToken(token string) error
-	GetUserByToken(token string) (uuid.UUID, error)
+	FindByEmail(email string) (*domain.User, error)
+	FindByID(id string) (*domain.User, error)
+	StoreRefreshToken(userID, token string) error
+	ValidateRefreshToken(token string) error
+	InvalidateRefreshToken(token string) error
 	Logout(userID string) error
 	DeleteUser(userID string) error
 }

@@ -5,8 +5,13 @@
 // @BasePath        /api/v1
 // @tag.name        URLs
 // @tag.description Operations with URLs
+// @tag.name        Auth
+// @tag.description Authentication and token management
 // @tag.name        Health
 // @tag.description Health check
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 package main
 
 import (

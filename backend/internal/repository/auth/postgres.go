@@ -27,71 +27,83 @@ func (repo *PostgresRepository) CreateUser(user *domain.User) error {
 	return nil
 }
 
-func (repo *PostgresRepository) Authenticate(email string, hashedPassword string) (*domain.RefreshToken, error) {
+func (repo *PostgresRepository) FindByEmail(email string) (*domain.User, error) {
 	ctx := context.Background()
 
-	user, err := gorm.G[domain.User](repo.db).Where("email = ? AND password = ?", email, hashedPassword).First(ctx)
+	var user domain.User
+	result := repo.db.WithContext(ctx).Where("email = ?", email).First(&user)
+	if result.Error != nil {
+		return nil, domain.ErrUserNotFound
+	}
+
+	return &user, nil
+}
+
+func (repo *PostgresRepository) FindByID(id string) (*domain.User, error) {
+	ctx := context.Background()
+
+	userID, err := uuid.Parse(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, domain.ErrInvalidCredentials
-		}
-		return nil, domain.ErrInternal
+		return nil, domain.ErrUserNotFound
+	}
+
+	var user domain.User
+	result := repo.db.WithContext(ctx).Where("id = ?", userID).First(&user)
+	if result.Error != nil {
+		return nil, domain.ErrUserNotFound
+	}
+
+	return &user, nil
+}
+
+func (repo *PostgresRepository) StoreRefreshToken(userID, token string) error {
+	ctx := context.Background()
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return domain.ErrInternal
 	}
 
 	refreshToken := &domain.RefreshToken{
 		ID:         uuid.New(),
-		Token:      uuid.NewString(),
-		UserID:     user.ID,
+		Token:      token,
+		UserID:     userUUID,
 		ValidUntil: time.Now().Add(7 * 24 * time.Hour),
 	}
 
-	_, err = gorm.G[domain.RefreshToken](repo.db).Where("user_id = ?", user.ID).Update(ctx, "valid_until", time.Now())
-	if err != nil {
-		return nil, domain.ErrInternal
-	}
-
-	err = gorm.G[domain.RefreshToken](repo.db).Create(ctx, refreshToken)
-	if err != nil {
-		return nil, domain.ErrInternal
-	}
-
-	return refreshToken, nil
-}
-
-func (repo *PostgresRepository) ValidateToken(token string) error {
-	ctx := context.Background()
-
-	refreshToken, err := gorm.G[domain.RefreshToken](repo.db).Where("token = ?", token).First(ctx)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return domain.ErrInvalidToken
-		}
+	result := repo.db.WithContext(ctx).Create(refreshToken)
+	if result.Error != nil {
 		return domain.ErrInternal
-	}
-
-	if time.Now().After(refreshToken.ValidUntil) {
-		return domain.ErrInvalidToken
 	}
 
 	return nil
 }
 
-func (repo *PostgresRepository) GetUserByToken(token string) (uuid.UUID, error) {
+func (repo *PostgresRepository) ValidateRefreshToken(token string) error {
 	ctx := context.Background()
 
-	refreshToken, err := gorm.G[domain.RefreshToken](repo.db).Where("token = ?", token).First(ctx)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return uuid.Nil, domain.ErrInvalidToken
-		}
-		return uuid.Nil, domain.ErrInternal
+	var refreshToken domain.RefreshToken
+	result := repo.db.WithContext(ctx).Where("token = ?", token).First(&refreshToken)
+	if result.Error != nil {
+		return domain.ErrInvalidToken
 	}
 
 	if time.Now().After(refreshToken.ValidUntil) {
-		return uuid.Nil, domain.ErrInvalidToken
+		return domain.ErrTokenExpired
 	}
 
-	return refreshToken.UserID, nil
+	return nil
+}
+
+func (repo *PostgresRepository) InvalidateRefreshToken(token string) error {
+	ctx := context.Background()
+
+	result := repo.db.WithContext(ctx).Where("token = ?", token).Delete(&domain.RefreshToken{})
+	if result.Error != nil {
+		return domain.ErrInternal
+	}
+
+	return nil
 }
 
 func (repo *PostgresRepository) DeleteUser(userID string) error {
@@ -102,12 +114,12 @@ func (repo *PostgresRepository) DeleteUser(userID string) error {
 		return domain.ErrInvalidCredentials
 	}
 
-	rowsAffected, err := gorm.G[domain.User](repo.db).Where("id = ?", userIDInUUID).Delete(ctx)
-	if err != nil {
+	result := repo.db.WithContext(ctx).Where("id = ?", userIDInUUID).Delete(&domain.User{})
+	if result.Error != nil {
 		return domain.ErrInternal
 	}
 
-	if rowsAffected == 0 {
+	if result.RowsAffected == 0 {
 		return domain.ErrUserNotFound
 	}
 
@@ -122,8 +134,8 @@ func (repo *PostgresRepository) Logout(userID string) error {
 		return domain.ErrInvalidCredentials
 	}
 
-	_, err = gorm.G[domain.RefreshToken](repo.db).Where("user_id = ?", userIDInUUID).Delete(ctx)
-	if err != nil {
+	result := repo.db.WithContext(ctx).Where("user_id = ?", userIDInUUID).Delete(&domain.RefreshToken{})
+	if result.Error != nil {
 		return domain.ErrInternal
 	}
 
