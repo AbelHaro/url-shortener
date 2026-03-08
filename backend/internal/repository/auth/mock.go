@@ -32,42 +32,53 @@ func (m *MockRepository) CreateUser(user *domain.User) error {
 	return nil
 }
 
-func (m *MockRepository) Authenticate(email string, hashedPassword string) (*domain.RefreshToken, error) {
+func (m *MockRepository) FindByEmail(email string) (*domain.User, error) {
 	for _, user := range m.users {
-		if user.Email == email && user.Password == hashedPassword {
-			refreshToken := &domain.RefreshToken{
-				ID:         uuid.New(),
-				Token:      uuid.NewString(),
-				UserID:     user.ID,
-				ValidUntil: time.Now().Add(7 * 24 * time.Hour),
-			}
-			m.refreshTokens[refreshToken.Token] = refreshToken
-			return refreshToken, nil
+		if user.Email == email {
+			return user, nil
 		}
 	}
-	return nil, domain.ErrInvalidCredentials
+	return nil, domain.ErrUserNotFound
 }
 
-func (m *MockRepository) ValidateToken(token string) error {
+func (m *MockRepository) FindByID(id string) (*domain.User, error) {
+	user, ok := m.users[id]
+	if !ok {
+		return nil, domain.ErrUserNotFound
+	}
+	return user, nil
+}
+
+func (m *MockRepository) StoreRefreshToken(userID, token string) error {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return domain.ErrInternal
+	}
+
+	refreshToken := &domain.RefreshToken{
+		ID:         uuid.New(),
+		Token:      token,
+		UserID:     userUUID,
+		ValidUntil: time.Now().Add(7 * 24 * time.Hour),
+	}
+	m.refreshTokens[token] = refreshToken
+	return nil
+}
+
+func (m *MockRepository) ValidateRefreshToken(token string) error {
 	rt, ok := m.refreshTokens[token]
 	if !ok {
 		return domain.ErrInvalidToken
 	}
 	if time.Now().After(rt.ValidUntil) {
-		return domain.ErrInvalidToken
+		return domain.ErrTokenExpired
 	}
 	return nil
 }
 
-func (m *MockRepository) GetUserByToken(token string) (uuid.UUID, error) {
-	rt, ok := m.refreshTokens[token]
-	if !ok {
-		return uuid.Nil, domain.ErrInvalidToken
-	}
-	if time.Now().After(rt.ValidUntil) {
-		return uuid.Nil, domain.ErrInvalidToken
-	}
-	return rt.UserID, nil
+func (m *MockRepository) InvalidateRefreshToken(token string) error {
+	delete(m.refreshTokens, token)
+	return nil
 }
 
 func (m *MockRepository) Logout(userID string) error {

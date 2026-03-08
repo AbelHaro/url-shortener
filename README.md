@@ -43,6 +43,19 @@ go run ./cmd/api
 
 The API will be available at `http://localhost:8080`
 
+### Generate Swagger Docs
+
+From `backend/`:
+
+```bash
+go install github.com/swaggo/swag/cmd/swag@latest
+swag init -g main.go -d cmd/api,internal/delivery/http,internal/domain -o docs --parseInternal
+```
+
+After starting the backend in debug mode, open:
+
+`http://localhost:8080/swagger/index.html`
+
 ### Frontend Setup
 
 ```bash

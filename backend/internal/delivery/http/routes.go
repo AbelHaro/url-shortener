@@ -1,23 +1,17 @@
 package http
 
 import (
-	"fmt"
-	"net/url"
 	"time"
 
 	"github.com/AbelHaro/url-shortener/backend/docs"
+	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/middleware"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-var allowedOrigins = []string{
-	"http://localhost:5173/",
-	"https://url-shortener.abelharo.me/",
-}
-
-func SetupRoutes(r *gin.Engine, h *URLHandler) {
+func SetupRoutes(r *gin.Engine, urlHandler *URLHandler, authHandler *AuthHandler, refererMiddleware *middleware.RefererMiddleware, jwtMiddleware *middleware.JWTMiddleware) {
 	docs.SwaggerInfo.Title = "URL Shortener API"
 	docs.SwaggerInfo.Description = "API for shortening and managing URLs"
 	docs.SwaggerInfo.Version = "1.0"
@@ -34,7 +28,7 @@ func SetupRoutes(r *gin.Engine, h *URLHandler) {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	r.GET("/health", h.Health)
+	r.GET("/health", urlHandler.Health)
 
 	if gin.IsDebugging() {
 		r.GET("/swagger/*any", ginSwagger.WrapHandler(
@@ -44,51 +38,36 @@ func SetupRoutes(r *gin.Engine, h *URLHandler) {
 	}
 
 	api := r.Group("/api/v1")
-	api.Use(refererMiddleware())
+	api.Use(refererMiddleware.Authenticate())
 	{
-		api.POST("/shorten", h.Create)
-		api.GET("/urls/short/:shortCode", h.FindByShortCode)
-		api.GET("/urls/:id", h.FindByID)
-		api.DELETE("/urls/:id", h.DeleteByID)
-		api.POST("/urls/search", h.FindByOriginalURL)
-		api.GET("/:shortURL", h.Redirect)
+		// Public auth endpoints
+		auth := api.Group("/auth")
+		{
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/login", authHandler.Login)
+			auth.POST("/refresh", authHandler.RefreshToken)
+		}
+
+		// Protected auth endpoints
+		authProtected := api.Group("/auth")
+		authProtected.Use(jwtMiddleware.Authenticate())
+		{
+			authProtected.POST("/logout", authHandler.Logout)
+		}
+
+		// URL endpoints (protected with JWT)
+		urls := api.Group("")
+		urls.Use(jwtMiddleware.Authenticate())
+		{
+			urls.POST("/shorten", urlHandler.Create)
+			urls.GET("/urls/short/:shortCode", urlHandler.FindByShortCode)
+			urls.GET("/urls/:id", urlHandler.FindByID)
+			urls.DELETE("/urls/:id", urlHandler.DeleteByID)
+			urls.POST("/urls/search", urlHandler.FindByOriginalURL)
+		}
+
+		// Public redirect endpoint (no auth required)
+		api.GET("/:shortURL", urlHandler.Redirect)
 	}
 
-}
-
-func refererMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if gin.IsDebugging() {
-			c.Next()
-			return
-		}
-
-		referer := c.GetHeader("Referer")
-		if referer == "" {
-			c.AbortWithStatusJSON(401, ErrorResponse{Error: "unauthorized access"})
-			return
-		}
-
-		valid := false
-		refererURL, err := url.Parse(referer)
-		if err == nil {
-			refererHost := refererURL.Host
-			for _, origin := range allowedOrigins {
-				originURL, err := url.Parse(origin)
-				if err == nil && refererHost == originURL.Host {
-					valid = true
-					break
-				}
-			}
-		}
-
-		fmt.Printf("Referer: %s, Valid: %t\n", referer, valid)
-
-		if !valid {
-			c.AbortWithStatusJSON(401, ErrorResponse{Error: "unauthorized access"})
-			return
-		}
-
-		c.Next()
-	}
 }
