@@ -7,7 +7,10 @@ import (
 	"time"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http"
+	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/auth"
+	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/health"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/middleware"
+	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/url"
 	"github.com/AbelHaro/url-shortener/backend/internal/infrastructure/database"
 	authRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/auth"
 	counterRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/counter"
@@ -33,21 +36,17 @@ func NewApp() *App {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Initialize repositories
 	urlRepoInstance := urlRepo.NewPostgresRepository(db)
 	counterRepoInstance := counterRepo.NewPostgresRepository(db)
 	authRepoInstance := authRepo.NewPostgresRepository(db)
 
-	// Initialize counter service
 	counter, err := counterSvc.NewService(counterRepoInstance)
 	if err != nil {
 		log.Fatalf("Failed to initialize counter service: %v", err)
 	}
 
-	// Initialize URL service
 	urlService := urlSvc.NewService(urlRepoInstance, counter)
 
-	// Initialize JWT service
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		log.Fatal("JWT_SECRET environment variable is required")
@@ -55,7 +54,7 @@ func NewApp() *App {
 
 	accessTTLStr := os.Getenv("JWT_ACCESS_TOKEN_TTL")
 	if accessTTLStr == "" {
-		accessTTLStr = "15m" // Default to 15 minutes
+		accessTTLStr = "15m"
 	}
 	accessTTL, err := parseTimeString(accessTTLStr)
 	if err != nil {
@@ -64,7 +63,7 @@ func NewApp() *App {
 
 	refreshTTLStr := os.Getenv("JWT_REFRESH_TOKEN_TTL")
 	if refreshTTLStr == "" {
-		refreshTTLStr = "168h" // Default to 7 days
+		refreshTTLStr = "168h"
 	}
 	refreshTTL, err := parseTimeString(refreshTTLStr)
 	if err != nil {
@@ -73,10 +72,8 @@ func NewApp() *App {
 
 	jwtService := jwtSvc.NewService(jwtSecret, accessTTL, refreshTTL)
 
-	// Initialize auth service
 	authService := authSvc.NewService(authRepoInstance, jwtService)
 
-	// Initialize Gin router
 	router := gin.Default()
 
 	if proxies := os.Getenv("TRUSTED_PROXIES"); proxies != "" {
@@ -85,14 +82,13 @@ func NewApp() *App {
 		}
 	}
 
-	// Initialize handlers
-	urlHandler := http.NewURLHandler(urlService)
-	authHandler := http.NewAuthHandler(authService)
+	urlHandler := url.NewHandler(urlService)
+	healthHandler := health.NewHandler()
+	authHandler := auth.NewHandler(authService)
 	refererMiddleware := middleware.NewRefererMiddleware()
 	jwtMiddleware := middleware.NewJWTMiddleware(authService)
 
-	// Setup routes
-	http.SetupRoutes(router, urlHandler, authHandler, refererMiddleware, jwtMiddleware)
+	http.SetupRoutes(router, urlHandler, healthHandler, authHandler, refererMiddleware, jwtMiddleware)
 
 	return &App{router: router, db: db}
 }

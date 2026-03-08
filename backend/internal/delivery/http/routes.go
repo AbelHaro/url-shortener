@@ -4,14 +4,17 @@ import (
 	"time"
 
 	"github.com/AbelHaro/url-shortener/backend/docs"
+	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/auth"
+	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/health"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/middleware"
+	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/url"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func SetupRoutes(r *gin.Engine, urlHandler *URLHandler, authHandler *AuthHandler, refererMiddleware *middleware.RefererMiddleware, jwtMiddleware *middleware.JWTMiddleware) {
+func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.Handler, authHandler *auth.Handler, refererMiddleware *middleware.RefererMiddleware, jwtMiddleware *middleware.JWTMiddleware) {
 	docs.SwaggerInfo.Title = "URL Shortener API"
 	docs.SwaggerInfo.Description = "API for shortening and managing URLs"
 	docs.SwaggerInfo.Version = "1.0"
@@ -28,7 +31,7 @@ func SetupRoutes(r *gin.Engine, urlHandler *URLHandler, authHandler *AuthHandler
 		MaxAge:           12 * time.Hour,
 	}))
 
-	r.GET("/health", urlHandler.Health)
+	r.GET("/health", healthHandler.Health)
 
 	if gin.IsDebugging() {
 		r.GET("/swagger/*any", ginSwagger.WrapHandler(
@@ -40,22 +43,19 @@ func SetupRoutes(r *gin.Engine, urlHandler *URLHandler, authHandler *AuthHandler
 	api := r.Group("/api/v1")
 	api.Use(refererMiddleware.Authenticate())
 	{
-		// Public auth endpoints
-		auth := api.Group("/auth")
+		authGroup := api.Group("/auth")
 		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
-			auth.POST("/refresh", authHandler.RefreshToken)
+			authGroup.POST("/register", authHandler.Register)
+			authGroup.POST("/login", authHandler.Login)
+			authGroup.POST("/refresh", authHandler.RefreshToken)
 		}
 
-		// Protected auth endpoints
 		authProtected := api.Group("/auth")
 		authProtected.Use(jwtMiddleware.Authenticate())
 		{
 			authProtected.POST("/logout", authHandler.Logout)
 		}
 
-		// URL endpoints (protected with JWT)
 		urls := api.Group("")
 		urls.Use(jwtMiddleware.Authenticate())
 		{
@@ -66,7 +66,6 @@ func SetupRoutes(r *gin.Engine, urlHandler *URLHandler, authHandler *AuthHandler
 			urls.POST("/urls/search", urlHandler.FindByOriginalURL)
 		}
 
-		// Public redirect endpoint (no auth required)
 		api.GET("/:shortURL", urlHandler.Redirect)
 	}
 
