@@ -1,7 +1,7 @@
 services:
-  db:
+  db-backend:
     image: postgres:18
-    container_name: url-shortener-postgres-db-dev
+    container_name: url-shortener-postgres-db-backend-dev
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -12,5 +12,17 @@ services:
       - "5432:5432"
     restart: unless-stopped
 
+  db-rangealloc:
+    image: postgres:18
+    container_name: url-shortener-postgres-db-rangealloc-dev
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=url_shortener_rangealloc
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
 volumes:
   postgres_data:
