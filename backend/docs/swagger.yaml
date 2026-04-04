@@ -1,5 +1,52 @@
 basePath: /api/v1
 definitions:
+  auth.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  auth.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  auth.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  auth.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  auth.TokenResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  auth.UserResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+    type: object
   domain.URL:
     properties:
       created_at:
@@ -15,70 +62,39 @@ definitions:
       user_id:
         type: string
     type: object
-  http.CreateShortenRequest:
+  dtos.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  dtos.V1AllocateRangeResponse:
+    properties:
+      current_offset:
+        type: integer
+      id:
+        type: string
+      last:
+        type: integer
+      start:
+        type: integer
+    type: object
+  dtos.V1CreateShortenRequest:
     properties:
       original_url:
         type: string
     required:
     - original_url
     type: object
-  http.ErrorResponse:
-    properties:
-      error:
-        type: string
-    type: object
-  http.HealthResponse:
-    properties:
-      status:
-        type: string
-    type: object
-  http.LoginRequest:
-    properties:
-      email:
-        type: string
-      password:
-        type: string
-    required:
-    - email
-    - password
-    type: object
-  http.RefreshTokenRequest:
-    properties:
-      refresh_token:
-        type: string
-    required:
-    - refresh_token
-    type: object
-  http.RegisterRequest:
-    properties:
-      email:
-        type: string
-      password:
-        minLength: 8
-        type: string
-    required:
-    - email
-    - password
-    type: object
-  http.SearchByOriginalURLRequest:
+  dtos.V1SearchByOriginalURLRequest:
     properties:
       url:
         type: string
     required:
     - url
     type: object
-  http.TokenResponse:
+  health.Response:
     properties:
-      access_token:
-        type: string
-      refresh_token:
-        type: string
-    type: object
-  http.UserResponse:
-    properties:
-      email:
-        type: string
-      id:
+      status:
         type: string
     type: object
 host: localhost:8080
@@ -115,22 +131,22 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.LoginRequest'
+          $ref: '#/definitions/auth.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.TokenResponse'
+            $ref: '#/definitions/auth.TokenResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/http.ErrorResponse'
+            $ref: '#/definitions/auth.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/http.ErrorResponse'
+            $ref: '#/definitions/auth.ErrorResponse'
       summary: Login user
       tags:
       - Auth
@@ -143,7 +159,7 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/http.ErrorResponse'
+            $ref: '#/definitions/auth.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Logout user
@@ -160,22 +176,22 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.RefreshTokenRequest'
+          $ref: '#/definitions/auth.RefreshTokenRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.TokenResponse'
+            $ref: '#/definitions/auth.TokenResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/http.ErrorResponse'
+            $ref: '#/definitions/auth.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/http.ErrorResponse'
+            $ref: '#/definitions/auth.ErrorResponse'
       summary: Refresh access token
       tags:
       - Auth
@@ -190,18 +206,18 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.RegisterRequest'
+          $ref: '#/definitions/auth.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/http.UserResponse'
+            $ref: '#/definitions/auth.UserResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/http.ErrorResponse'
+            $ref: '#/definitions/auth.ErrorResponse'
       summary: Register a new user
       tags:
       - Auth
@@ -214,10 +230,77 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.HealthResponse'
+            $ref: '#/definitions/health.Response'
       summary: Health check
       tags:
       - Health
+  /ranges/{id}/offset:
+    put:
+      consumes:
+      - application/json
+      description: Update the offset of a range
+      parameters:
+      - description: Range ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New offset value
+        in: query
+        name: offset
+        required: true
+        type: integer
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+      summary: Update the offset of a range. Given a range of 100_000, if the offset
+        is 1_000, each 1_000 numbers incremented in the range will be marked as used.
+        So if the offset is 1_000, the first 1_000 numbers in the range will be marked
+        as used, this is useful to not loose IDs in case of a failure in the URL shortening
+        service, so the next time the service is restarted, it can continue from the
+        last offset instead of starting from the beginning of the range avoiding to
+        loose IDs.
+      tags:
+      - Range Allocation
+  /ranges/allocate:
+    post:
+      consumes:
+      - application/json
+      description: Allocate a range of IDs for URL shortening
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.V1AllocateRangeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+      summary: Allocate a range of IDs
+      tags:
+      - Range Allocation
   /shorten:
     post:
       consumes:
@@ -229,7 +312,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.CreateShortenRequest'
+          $ref: '#/definitions/dtos.V1CreateShortenRequest'
       produces:
       - application/json
       responses:
@@ -240,7 +323,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/http.ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Shorten a URL
       tags:
       - URLs
@@ -259,7 +342,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/http.ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Delete URL
       tags:
       - URLs
@@ -281,7 +364,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/http.ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Get URL by ID
       tags:
       - URLs
@@ -296,7 +379,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.SearchByOriginalURLRequest'
+          $ref: '#/definitions/dtos.V1SearchByOriginalURLRequest'
       produces:
       - application/json
       responses:
@@ -307,7 +390,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/http.ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Search URL by original URL
       tags:
       - URLs
@@ -330,7 +413,7 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/http.ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Get URL by short code
       tags:
       - URLs

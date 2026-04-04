@@ -12,6 +12,7 @@ import (
 	"net/http"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
+	"github.com/AbelHaro/url-shortener/backend/internal/dtos"
 	"github.com/AbelHaro/url-shortener/backend/internal/service/url"
 	"github.com/gin-gonic/gin"
 )
@@ -24,34 +25,22 @@ func NewHandler(svc *url.Service) *Handler {
 	return &Handler{Service: svc}
 }
 
-type CreateShortenRequest struct {
-	OriginalUrl string `json:"original_url" binding:"required"`
-}
-
-type SearchByOriginalURLRequest struct {
-	URL string `json:"url" binding:"required"`
-}
-
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
 // Create shorten URL
 // @Summary Shorten a URL
 // @Description Create a shortened URL from a long URL
 // @Tags URLs
 // @Accept json
 // @Produce json
-// @Param request body CreateShortenRequest true "Request body"
+// @Param request body dtos.V1CreateShortenRequest true "Request body"
 // @Success 201 {object} domain.URL
-// @Failure 400 {object} ErrorResponse
+// @Failure 400 {object} dtos.ErrorResponse
 // @Router /shorten [post]
 func (h *Handler) Create(c *gin.Context) {
-	var req CreateShortenRequest
+	var req dtos.V1CreateShortenRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Println(err)
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: "invalid request body"})
 		return
 	}
 
@@ -90,7 +79,7 @@ func (h *Handler) Redirect(c *gin.Context) {
 // @Produce json
 // @Param id path string true "URL ID"
 // @Success 200 {object} domain.URL
-// @Failure 404 {object} ErrorResponse
+// @Failure 404 {object} dtos.ErrorResponse
 // @Router /urls/{id} [get]
 func (h *Handler) FindByID(c *gin.Context) {
 	id := c.Param("id")
@@ -111,7 +100,7 @@ func (h *Handler) FindByID(c *gin.Context) {
 // @Produce json
 // @Param shortCode path string true "Short Code"
 // @Success 200 {object} domain.URL
-// @Failure 404 {object} ErrorResponse
+// @Failure 404 {object} dtos.ErrorResponse
 // @Router /urls/short/{shortCode} [get]
 func (h *Handler) FindByShortCode(c *gin.Context) {
 	shortCode := c.Param("shortCode")
@@ -131,7 +120,7 @@ func (h *Handler) FindByShortCode(c *gin.Context) {
 // @Tags URLs
 // @Param id path string true "URL ID"
 // @Success 204
-// @Failure 404 {object} ErrorResponse
+// @Failure 404 {object} dtos.ErrorResponse
 // @Router /urls/{id} [delete]
 func (h *Handler) DeleteByID(c *gin.Context) {
 	id := c.Param("id")
@@ -151,15 +140,15 @@ func (h *Handler) DeleteByID(c *gin.Context) {
 // @Tags URLs
 // @Accept json
 // @Produce json
-// @Param request body SearchByOriginalURLRequest true "Request body"
+// @Param request body dtos.V1SearchByOriginalURLRequest true "Request body"
 // @Success 200 {object} domain.URL
-// @Failure 404 {object} ErrorResponse
+// @Failure 404 {object} dtos.ErrorResponse
 // @Router /urls/search [post]
 func (h *Handler) FindByOriginalURL(c *gin.Context) {
-	var req SearchByOriginalURLRequest
+	var req dtos.V1SearchByOriginalURLRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: "invalid request body"})
 		return
 	}
 
@@ -170,7 +159,7 @@ func (h *Handler) FindByOriginalURL(c *gin.Context) {
 	}
 
 	if urlFound == nil {
-		c.JSON(http.StatusNotFound, ErrorResponse{Error: "url not found"})
+		c.JSON(http.StatusNotFound, dtos.ErrorResponse{Error: "url not found"})
 		return
 	}
 
@@ -180,10 +169,10 @@ func (h *Handler) FindByOriginalURL(c *gin.Context) {
 func (h *Handler) handleError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrURLNotFound):
-		c.JSON(http.StatusNotFound, ErrorResponse{Error: err.Error()})
+		c.JSON(http.StatusNotFound, dtos.ErrorResponse{Error: err.Error()})
 	case errors.Is(err, domain.ErrInvalidURL):
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: err.Error()})
 	default:
-		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "internal server error"})
+		c.JSON(http.StatusInternalServerError, dtos.ErrorResponse{Error: "internal server error"})
 	}
 }
