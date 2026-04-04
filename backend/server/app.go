@@ -10,14 +10,17 @@ import (
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/auth"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/health"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/middleware"
+	rangehandler "github.com/AbelHaro/url-shortener/backend/internal/delivery/http/range"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/url"
 	"github.com/AbelHaro/url-shortener/backend/internal/infrastructure/database"
 	authRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/auth"
 	counterRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/counter"
+	rangeRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/range"
 	urlRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/url"
 	authSvc "github.com/AbelHaro/url-shortener/backend/internal/service/auth"
 	counterSvc "github.com/AbelHaro/url-shortener/backend/internal/service/counter"
 	jwtSvc "github.com/AbelHaro/url-shortener/backend/internal/service/jwt"
+	rangeSvc "github.com/AbelHaro/url-shortener/backend/internal/service/range"
 	urlSvc "github.com/AbelHaro/url-shortener/backend/internal/service/url"
 
 	"github.com/gin-gonic/gin"
@@ -39,6 +42,7 @@ func NewApp() *App {
 	urlRepoInstance := urlRepo.NewPostgresRepository(db)
 	counterRepoInstance := counterRepo.NewPostgresRepository(db)
 	authRepoInstance := authRepo.NewPostgresRepository(db)
+	rangeRepoInstance := rangeRepo.NewPostgresRepository(db)
 
 	counter, err := counterSvc.NewService(counterRepoInstance)
 	if err != nil {
@@ -46,6 +50,7 @@ func NewApp() *App {
 	}
 
 	urlService := urlSvc.NewService(urlRepoInstance, counter)
+	rangeService := rangeSvc.NewService(rangeRepoInstance)
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -85,10 +90,11 @@ func NewApp() *App {
 	urlHandler := url.NewHandler(urlService)
 	healthHandler := health.NewHandler()
 	authHandler := auth.NewHandler(authService)
+	rangeHandlerInstance := rangehandler.NewHandler(rangeService)
 	refererMiddleware := middleware.NewRefererMiddleware()
 	jwtMiddleware := middleware.NewJWTMiddleware(authService)
 
-	http.SetupRoutes(router, urlHandler, healthHandler, authHandler, refererMiddleware, jwtMiddleware)
+	http.SetupRoutes(router, urlHandler, healthHandler, authHandler, rangeHandlerInstance, refererMiddleware, jwtMiddleware)
 
 	return &App{router: router, db: db}
 }
