@@ -20,7 +20,7 @@ type PostgresRepository struct {
 func NewPostgresRepository(db *gorm.DB) Repository {
 	return &PostgresRepository{db: db}
 }
-func (p *PostgresRepository) AllocateRange(ownerID uuid.UUID) (*domain.Range, error) {
+func (p *PostgresRepository) AllocateRange() (*domain.Range, error) {
 	ctx := context.Background()
 
 	var rangeAllocated *domain.Range
@@ -40,7 +40,6 @@ func (p *PostgresRepository) AllocateRange(ownerID uuid.UUID) (*domain.Range, er
 			ID:            uuid.New(),
 			Start:         lastRange,
 			Last:          lastRange + RANGE_SIZE, // The end is not inclusive, so we can allocate the next range starting from lastRange + RANGE_SIZE
-			OwnerID:       ownerID,
 			CurrentOffset: 0,
 		}
 
@@ -67,12 +66,12 @@ func (p *PostgresRepository) AllocateRange(ownerID uuid.UUID) (*domain.Range, er
 	return rangeAllocated, nil
 }
 
-func (p *PostgresRepository) UpdateRangeOffset(rangeID uuid.UUID, ownerID uuid.UUID) error {
+func (p *PostgresRepository) UpdateRangeOffset(rangeID uuid.UUID) error {
 	ctx := context.Background()
 
 	err := p.db.Transaction(func(tx *gorm.DB) error {
 
-		rangeToBeUpdated, err := gorm.G[domain.Range](p.db).Where("id = ? AND owner_id = ?", rangeID, ownerID).First(ctx)
+		rangeToBeUpdated, err := gorm.G[domain.Range](p.db).Where("id = ?", rangeID).First(ctx)
 		if err != nil {
 			return domain.ErrRangeNotFound
 		}
@@ -83,6 +82,7 @@ func (p *PostgresRepository) UpdateRangeOffset(rangeID uuid.UUID, ownerID uuid.U
 			return domain.ErrRangeConsumed
 		}
 
+		// I the start is 2000, last is 3000, and the current offset is 900, it means that we are announcing that the ids between 2900 and 2999 are already used, so we need to update the offset to 3000 to avoid duplicating IDs. In this case, the range is already consumed, so we need to allocate a new range.
 		if rangeToBeUpdated.Start+rangeToBeUpdated.CurrentOffset+RANGE_OFFSET > rangeToBeUpdated.Last {
 			return domain.ErrInvalidRange
 		}
@@ -115,18 +115,16 @@ func (p *PostgresRepository) GetNextRangeAvailable() (lastRange uint64, err erro
 	return rangeRecord.Last, nil
 }
 
-func (p *PostgresRepository) GetActiveRange(ownerID uuid.UUID) (*domain.Range, error) {
+func (p *PostgresRepository) GetActiveRange() (*domain.Range, error) {
 	ctx := context.Background()
 
-	activeRange, err := gorm.G[domain.Range](p.db).Where(`owner_id = ? AND (start + current_offset) < last`, ownerID).Take(ctx)
+	activeRange, err := gorm.G[domain.Range](p.db).Where(`start + current_offset < last`).Take(ctx)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, domain.ErrInternal
 	}
-
-	//Update the current offset because if the client is recovering from a failure, it can be that some IDs in the range are already used, so we need to update the current offset to avoid duplicating IDs. For example, if the range is from 0 to 1000 and the offset is 200, it means that between 200 and 299 could be already used, so we need to update the offset to 300 to avoid duplicating IDs.
 
 	return &activeRange, nil
 }

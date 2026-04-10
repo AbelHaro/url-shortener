@@ -1,0 +1,84 @@
+run:
+  timeout: 5m
+  tests: true
+  build-tags: []
+  issues-exit-code: 1
+
+linters:
+  enable:
+    # Code quality
+    - errcheck          # Checks unchecked errors
+    - ineffassign       # Detects when assignments to existing variables are not used
+    - unused            # Checks for unused constants, variables, functions and types
+    
+    # Style
+    - gofmt             # Checks whether code was gofmt-ed
+    - goimports         # In addition to fixing imports, goimports also formats code
+    - misspell          # Finds commonly misspelled English words
+    - unparam           # Reports unused function parameters
+    - gosimple          # Specializes in simplifying a code
+    - staticcheck       # Staticcheck is a go vet on steroids, applying lots of static analysis checks
+    - bodyclose         # Checks whether HTTP response body is closed successfully
+    
+    # Security
+    - gosec             # Inspects source code for security problems
+    
+    # Best practices
+    - prealloc          # Finds slice declarations that could potentially be preallocated
+    - nolintlint        # Reports ill-formed or ineffective nolint directives
+    - errorlint         # Reports non-wrapped errors in error returns or assignments
+    - revive            # Fast linter for Go, replaces golint
+    - dogsled           # Checks assignments with too many blank identifiers
+    
+    # Performance
+    - unconvert         # Removes unnecessary type conversions
+
+linters-settings:
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-naming
+      - name: error-return
+      - name: error-strings
+      - name: errorf
+      - name: exported
+        arguments: ["checkPrivateReceivers"]
+      - name: increment-decrement
+      - name: indent-error-flow
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: redefines-builtin-id
+      - name: time-naming
+      - name: unexported-naming
+      - name: unnecessary-stmt
+      - name: var-declaration
+      - name: var-naming
+  
+  gosec:
+    # Severity level for messages
+    severity: medium
+  
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+issues:
+  exclude-dirs-use-default: true
+  exclude-use-default: true
+  exclude-rules:
+    # Ignore errors in tests
+    - path: _test\.go$
+      linters:
+        - errcheck
+        - gosec
+    
+    # Ignore long lines in generated code
+    - path: \.pb\.go$
+      text: "line too long"
+
+  max-issues-per-linter: 0
+  max-same-issues: 0

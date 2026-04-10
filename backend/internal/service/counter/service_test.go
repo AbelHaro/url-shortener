@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/cyrildever/feistel"
-
-	"github.com/AbelHaro/url-shortener/backend/internal/repository/counter"
 )
 
 func provideService() (*Service, error) {
