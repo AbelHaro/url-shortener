@@ -7,7 +7,6 @@ import (
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/auth"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/health"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/middleware"
-	rangehandler "github.com/AbelHaro/url-shortener/backend/internal/delivery/http/range"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/url"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -15,7 +14,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.Handler, authHandler *auth.Handler, rangeHandler *rangehandler.Handler, refererMiddleware *middleware.RefererMiddleware, jwtMiddleware *middleware.JWTMiddleware) {
+func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.Handler, authHandler *auth.Handler, refererMiddleware *middleware.RefererMiddleware, jwtMiddleware *middleware.JWTMiddleware) {
 	docs.SwaggerInfo.Title = "URL Shortener API"
 	docs.SwaggerInfo.Description = "API for shortening and managing URLs"
 	docs.SwaggerInfo.Version = "1.0"
@@ -66,16 +65,6 @@ func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.H
 			urls.DELETE("/urls/:id", urlHandler.DeleteByID)
 			urls.POST("/urls/search", urlHandler.FindByOriginalURL)
 		}
-
-		// Range allocation endpoints (internal subservice)
-		ranges := api.Group("/ranges")
-		ranges.Use(jwtMiddleware.Authenticate())
-		{
-			ranges.POST("/allocate", rangeHandler.Allocate)
-			ranges.PUT("/:id/offset", rangeHandler.UpdateOffset)
-		}
-
-		api.GET("/:shortURL", urlHandler.Redirect)
 	}
 
 }

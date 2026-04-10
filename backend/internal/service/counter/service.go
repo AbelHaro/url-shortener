@@ -5,46 +5,61 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/AbelHaro/url-shortener/backend/internal/domain"
+	rangeservice "github.com/AbelHaro/url-shortener/backend/internal/service/range"
 	"github.com/cyrildever/feistel"
-
-	counterRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/counter"
 )
 
 const base62Chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 type Service struct {
-	mu       sync.RWMutex
-	counter  int64
-	repo     counterRepo.Repository
-	cipher   *feistel.Cipher
-	maxValue uint64
+	mu           sync.RWMutex
+	counter      int64
+	rangeSvc     *rangeservice.Service
+	currentRange *domain.Range
+	cipher       *feistel.Cipher
+	maxValue     uint64
 }
 
-func NewService(repo counterRepo.Repository) (*Service, error) {
+func NewService(rangeSvc *rangeservice.Service) (*Service, error) {
 	svc := &Service{
-		repo:     repo,
+		rangeSvc: rangeSvc,
 		cipher:   feistel.NewCipher("url-shortener-secret-key-2026", 12),
 		maxValue: 62 * 62 * 62 * 62 * 62 * 62 * 62,
 	}
 
-	hashCounter, err := repo.GetCounter()
+	rangeAllocated, err := rangeSvc.AllocateRange()
 	if err != nil {
 		return nil, err
 	}
-	if hashCounter != nil {
-		atomic.StoreInt64(&svc.counter, hashCounter.Counter)
+	if rangeAllocated != nil {
+		atomic.StoreInt64(&svc.counter, int64(rangeAllocated.Start+rangeAllocated.CurrentOffset))
+		svc.currentRange = rangeAllocated
 	}
 
 	return svc, nil
 }
 
 func (svc *Service) NextBase62() (string, error) {
-	newVal := atomic.AddInt64(&svc.counter, 1)
 
-	if err := svc.repo.UpdateCounter(newVal); err != nil {
-		atomic.AddInt64(&svc.counter, -1)
-		return "", err
+	svc.mu.Lock()
+	defer svc.mu.Unlock()
+	newVal := atomic.AddInt64(&svc.counter, 1)
+	if newVal >= int64(svc.currentRange.Last) {
+		rangeAllocated, err := svc.rangeSvc.AllocateRange()
+		if err != nil {
+			return "", err
+		}
+		if rangeAllocated != nil {
+			atomic.StoreInt64(&svc.counter, int64(rangeAllocated.Start+rangeAllocated.CurrentOffset))
+			svc.currentRange = rangeAllocated
+			newVal = atomic.AddInt64(&svc.counter, 1)
+		} else {
+			return "", err
+		}
 	}
+
+	svc.mu.Unlock()
 
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, uint64(newVal))

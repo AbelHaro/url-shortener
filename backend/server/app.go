@@ -6,15 +6,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AbelHaro/url-shortener/backend/internal/config"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/auth"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/health"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/middleware"
-	rangehandler "github.com/AbelHaro/url-shortener/backend/internal/delivery/http/range"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/url"
 	"github.com/AbelHaro/url-shortener/backend/internal/infrastructure/database"
 	authRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/auth"
-	counterRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/counter"
 	rangeRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/range"
 	urlRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/url"
 	authSvc "github.com/AbelHaro/url-shortener/backend/internal/service/auth"
@@ -33,24 +32,27 @@ type App struct {
 }
 
 func NewApp() *App {
-	cfg := database.LoadConfig()
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
 	db, err := database.NewDB(cfg)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
 	urlRepoInstance := urlRepo.NewPostgresRepository(db)
-	counterRepoInstance := counterRepo.NewPostgresRepository(db)
 	authRepoInstance := authRepo.NewPostgresRepository(db)
 	rangeRepoInstance := rangeRepo.NewPostgresRepository(db)
 
-	counter, err := counterSvc.NewService(counterRepoInstance)
+	rangeSvcInstance := rangeSvc.NewService(rangeRepoInstance)
+
+	counterService, err := counterSvc.NewService(rangeSvcInstance)
 	if err != nil {
 		log.Fatalf("Failed to initialize counter service: %v", err)
 	}
 
-	urlService := urlSvc.NewService(urlRepoInstance, counter)
-	rangeService := rangeSvc.NewService(rangeRepoInstance)
+	urlService := urlSvc.NewService(urlRepoInstance, counterService)
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -90,11 +92,10 @@ func NewApp() *App {
 	urlHandler := url.NewHandler(urlService)
 	healthHandler := health.NewHandler()
 	authHandler := auth.NewHandler(authService)
-	rangeHandlerInstance := rangehandler.NewHandler(rangeService)
 	refererMiddleware := middleware.NewRefererMiddleware()
 	jwtMiddleware := middleware.NewJWTMiddleware(authService)
 
-	http.SetupRoutes(router, urlHandler, healthHandler, authHandler, rangeHandlerInstance, refererMiddleware, jwtMiddleware)
+	http.SetupRoutes(router, urlHandler, healthHandler, authHandler, refererMiddleware, jwtMiddleware)
 
 	return &App{router: router, db: db}
 }
