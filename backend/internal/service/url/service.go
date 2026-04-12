@@ -38,6 +38,7 @@ func (svc *Service) Store(originalURL string, ownerID uuid.UUID) (*domain.URL, e
 	urlToInsert := &domain.URL{
 		OriginalURL: originalURL,
 		ShortCode:   shortCode,
+		UserID:      ownerID,
 	}
 
 	urlInserted, err := svc.repo.Store(urlToInsert)

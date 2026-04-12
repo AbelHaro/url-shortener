@@ -8,6 +8,7 @@ package url
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -33,7 +34,7 @@ func NewHandler(svc *url.Service) *Handler {
 // @Accept json
 // @Produce json
 // @Param request body dtos.V1CreateShortenRequest true "Request body"
-// @Success 201 {object} domain.URL
+// @Success 201 {object} dtos.V1URLResponse
 // @Failure 400 {object} dtos.V1ErrorResponse
 // @Router /shorten [post]
 func (h *Handler) Create(c *gin.Context) {
@@ -44,11 +45,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	ownerID, ok := ownerIDRaw.(uuid.UUID)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, dtos.V1ErrorResponse{Error: "invalid user ID type"})
-		return
-	}
+	ownerID := uuid.MustParse(fmt.Sprintf("%v", ownerIDRaw))
 
 	if ownerID == uuid.Nil {
 		c.JSON(http.StatusUnauthorized, dtos.V1ErrorResponse{Error: "invalid user ID"})
@@ -69,7 +66,16 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, urlCreated)
+	urlCreatedResponse := dtos.V1URLResponse{
+		ID:          urlCreated.ID,
+		OriginalURL: urlCreated.OriginalURL,
+		ShortCode:   urlCreated.ShortCode,
+		UserID:      urlCreated.UserID,
+		CreatedAt:   urlCreated.CreatedAt,
+		UpdatedAt:   urlCreated.UpdatedAt,
+	}
+
+	c.JSON(http.StatusCreated, urlCreatedResponse)
 }
 
 // Redirect to original URL

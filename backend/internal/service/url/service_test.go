@@ -44,7 +44,7 @@ func TestService_Store(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := svc.Store(tt.originalURL)
+			_, err := svc.Store(tt.originalURL, uuid.New())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Service.Store() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -71,7 +71,7 @@ func TestService_FindByShortCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			urlInserted, err := svc.Store(tt.originalURL)
+			urlInserted, err := svc.Store(tt.originalURL, uuid.New())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Service.Store() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -113,7 +113,7 @@ func TestService_FindByID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			urlInserted, err := svc.Store(tt.originalURL)
+			urlInserted, err := svc.Store(tt.originalURL, uuid.New())
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Service.Store() error = %v, wantErr %v", err, tt.wantErr)
@@ -157,7 +157,7 @@ func TestService_FindByOriginalURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			urlInserted, err := svc.Store(tt.originalURL)
+			urlInserted, err := svc.Store(tt.originalURL, uuid.New())
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Service.Store() error = %v, wantErr %v", err, tt.wantErr)
@@ -200,7 +200,7 @@ func TestService_DeleteByID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			if tt.id == uuid.Nil {
-				urlInserted, err := svc.Store(tt.originalURL)
+				urlInserted, err := svc.Store(tt.originalURL, uuid.New())
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Service.Store() error = %v, wantErr %v", err, tt.wantErr)
 				}
@@ -233,7 +233,7 @@ func TestService_DeleteByOriginalURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if !tt.wantErr {
-				_, err := svc.Store(tt.originalURL)
+				_, err := svc.Store(tt.originalURL, uuid.New())
 				if err != nil {
 					t.Fatalf("Service.Store() error = %v", err)
 				}
@@ -265,7 +265,7 @@ func TestService_DeleteByShortCode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if !tt.wantErr {
-				urlInserted, err := svc.Store(tt.originalURL)
+				urlInserted, err := svc.Store(tt.originalURL, uuid.New())
 				if err != nil {
 					t.Fatalf("Service.Store() error = %v", err)
 				}

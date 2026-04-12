@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AbelHaro/url-shortener/backend/internal/dtos"
 	authRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/auth"
 	authSvc "github.com/AbelHaro/url-shortener/backend/internal/service/auth"
 	"github.com/AbelHaro/url-shortener/backend/internal/service/jwt"
@@ -33,19 +34,18 @@ func TestHandler_Register(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		request    RegisterRequest
+		request    dtos.V1RegisterRequest
 		response   any
 		wantStatus int
 		wantError  bool
 	}{
 		{
 			name: "valid registration",
-			request: RegisterRequest{
+			request: dtos.V1RegisterRequest{
 				Email:    "test@example.com",
 				Password: "password123",
 			},
-			response: UserResponse{
-				ID:    "1",
+			response: dtos.V1UserResponse{
 				Email: "test@example.com",
 			},
 			wantStatus: http.StatusCreated,
@@ -54,28 +54,28 @@ func TestHandler_Register(t *testing.T) {
 
 		{
 			name: "invalid email",
-			request: RegisterRequest{
+			request: dtos.V1RegisterRequest{
 				Email:    "invalid-email",
 				Password: "password123",
 			},
-			response:   ErrorResponse{Error: "invalid request"},
+			response:   dtos.V1ErrorResponse{Error: "invalid request"},
 			wantStatus: http.StatusBadRequest,
 			wantError:  true,
 		},
 		{
 			name: "short password",
-			request: RegisterRequest{
+			request: dtos.V1RegisterRequest{
 				Email:    "test@example.com",
 				Password: "short",
 			},
-			response:   ErrorResponse{Error: "invalid request"},
+			response:   dtos.V1ErrorResponse{Error: "invalid request"},
 			wantStatus: http.StatusBadRequest,
 			wantError:  true,
 		},
 		{
 			name:       "empty request",
-			request:    RegisterRequest{},
-			response:   ErrorResponse{Error: "invalid request"},
+			request:    dtos.V1RegisterRequest{},
+			response:   dtos.V1ErrorResponse{Error: "invalid request"},
 			wantStatus: http.StatusBadRequest,
 			wantError:  true,
 		},
@@ -118,38 +118,38 @@ func TestHandler_Login(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		request    LoginRequest
+		request    dtos.V1LoginRequest
 		response   any
 		wantStatus int
 		wantError  bool
 	}{
 		{
 			name: "valid login",
-			request: LoginRequest{
+			request: dtos.V1LoginRequest{
 				Email:    "test@example.com",
 				Password: "password123",
 			},
-			response:   TokenResponse{AccessToken: "mockAccessToken", RefreshToken: "mockRefreshToken"},
+			response:   dtos.V1TokenResponse{AccessToken: "mockAccessToken", RefreshToken: "mockRefreshToken"},
 			wantStatus: http.StatusOK,
 			wantError:  false,
 		},
 		{
 			name: "invalid password",
-			request: LoginRequest{
+			request: dtos.V1LoginRequest{
 				Email:    "test@example.com",
 				Password: "wrongpassword",
 			},
-			response:   ErrorResponse{Error: "invalid credentials"},
+			response:   dtos.V1ErrorResponse{Error: "invalid credentials"},
 			wantStatus: http.StatusUnauthorized,
 			wantError:  true,
 		},
 		{
 			name: "non-existent user",
-			request: LoginRequest{
+			request: dtos.V1LoginRequest{
 				Email:    "nonexistent@example.com",
 				Password: "password123",
 			},
-			response:   ErrorResponse{Error: "invalid credentials"},
+			response:   dtos.V1ErrorResponse{Error: "invalid credentials"},
 			wantStatus: http.StatusUnauthorized,
 			wantError:  true,
 		},
@@ -197,26 +197,26 @@ func TestHandler_RefreshToken(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		request    RefreshTokenRequest
+		request    dtos.V1RefreshTokenRequest
 		response   any
 		wantStatus int
 		wantError  bool
 	}{
 		{
 			name: "valid refresh token",
-			request: RefreshTokenRequest{
+			request: dtos.V1RefreshTokenRequest{
 				RefreshToken: tokens.RefreshToken,
 			},
-			response:   TokenResponse{AccessToken: "mockAccessToken", RefreshToken: "mockRefreshToken"},
+			response:   dtos.V1TokenResponse{AccessToken: "mockAccessToken", RefreshToken: "mockRefreshToken"},
 			wantStatus: http.StatusOK,
 			wantError:  false,
 		},
 		{
 			name: "invalid refresh token",
-			request: RefreshTokenRequest{
+			request: dtos.V1RefreshTokenRequest{
 				RefreshToken: "invalidtoken",
 			},
-			response:   ErrorResponse{Error: "invalid refresh token"},
+			response:   dtos.V1ErrorResponse{Error: "invalid refresh token"},
 			wantStatus: http.StatusUnauthorized,
 			wantError:  true,
 		},
@@ -234,7 +234,7 @@ func TestHandler_RefreshToken(t *testing.T) {
 
 			router.ServeHTTP(w, req)
 
-			if !tt.wantError && (w.Body.String() == "" || !bytes.Contains([]byte(w.Body.String()), []byte("access_token")) || !bytes.Contains([]byte(w.Body.String()), []byte("refresh_token"))) {
+			if !tt.wantError && (w.Body.String() == "" || !bytes.Contains(w.Body.Bytes(), []byte("access_token")) || !bytes.Contains(w.Body.Bytes(), []byte("refresh_token"))) {
 				t.Errorf("expected access and refresh tokens in response, got %s", w.Body.String())
 			}
 			if w.Code != tt.wantStatus {

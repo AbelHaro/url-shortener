@@ -9,7 +9,7 @@ type V1RegisterRequest struct {
 // V1LoginRequest is the request to login a user
 type V1LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Password string `json:"password" binding:"required,min=8"`
 }
 
 // V1RefreshTokenRequest is the request to refresh an access token
