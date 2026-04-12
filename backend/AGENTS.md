@@ -2,6 +2,20 @@
 
 This file contains guidelines and commands for agentic coding agents working in this Go URL shortener repository.
 
+## Available Agent Skills
+
+The following specialized skills are available for agents working on this project:
+
+### golang-pro
+Implements concurrent Go patterns using goroutines and channels, designs and builds microservices with gRPC or REST, optimizes Go application performance with pprof, and enforces idiomatic Go with generics, interfaces, and robust error handling. Use when building Go applications requiring concurrent programming, microservices architecture, or high-performance systems.
+
+**Relevant for:** goroutines, channels, Go generics, gRPC integration, CLI tools, benchmarks, or table-driven testing.
+
+### golang-testing
+Go testing patterns including table-driven tests, subtests, benchmarks, fuzzing, and test coverage. Follows TDD methodology with idiomatic Go practices.
+
+**Relevant for:** Writing tests, benchmarks, test coverage analysis, and TDD workflows.
+
 ## Build/Test Commands
 
 ### Running Tests

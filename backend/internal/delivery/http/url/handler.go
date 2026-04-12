@@ -15,6 +15,7 @@ import (
 	"github.com/AbelHaro/url-shortener/backend/internal/dtos"
 	"github.com/AbelHaro/url-shortener/backend/internal/service/url"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -36,6 +37,24 @@ func NewHandler(svc *url.Service) *Handler {
 // @Failure 400 {object} dtos.ErrorResponse
 // @Router /shorten [post]
 func (h *Handler) Create(c *gin.Context) {
+
+	ownerIDRaw, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "user not authenticated"})
+		return
+	}
+
+	ownerID, ok := ownerIDRaw.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "invalid user ID type"})
+		return
+	}
+
+	if ownerID == uuid.Nil {
+		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "invalid user ID"})
+		return
+	}
+
 	var req dtos.V1CreateShortenRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -44,7 +63,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	urlCreated, err := h.Service.Store(req.OriginalUrl)
+	urlCreated, err := h.Service.Store(req.OriginalUrl, ownerID)
 	if err != nil {
 		h.handleError(c, err)
 		return

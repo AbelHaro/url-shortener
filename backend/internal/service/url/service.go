@@ -2,7 +2,6 @@ package url
 
 import (
 	"errors"
-	"log"
 	"net/url"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
@@ -23,7 +22,7 @@ func NewService(repo urlRepo.Repository, counterService *counter.Service) *Servi
 	}
 }
 
-func (svc *Service) Store(originalURL string) (*domain.URL, error) {
+func (svc *Service) Store(originalURL string, ownerID uuid.UUID) (*domain.URL, error) {
 	if err := svc.ValidateURL(originalURL); err != nil {
 		return nil, err
 	}
@@ -140,23 +139,23 @@ func (svc *Service) ValidateURL(rawURL string) error {
 	return nil
 }
 
-func (svc *Service) GenerateDevData() error {
-	urls := []string{
-		"https://google.com",
-		"https://github.com",
-		"https://stackoverflow.com",
-		"https://golang.org",
-		"https://gin-gonic.com",
-	}
+// func (svc *Service) GenerateDevData() error {
+// 	urls := []string{
+// 		"https://google.com",
+// 		"https://github.com",
+// 		"https://stackoverflow.com",
+// 		"https://golang.org",
+// 		"https://gin-gonic.com",
+// 	}
 
-	for _, u := range urls {
-		log.Println("Storing url", u)
-		_, err := svc.Store(u)
-		if err != nil {
-			return err
-		}
-		log.Println("Stored url", u)
-	}
+// 	for _, u := range urls {
+// 		log.Println("Storing url", u)
+// 		_, err := svc.Store(u)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		log.Println("Stored url", u)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
