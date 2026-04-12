@@ -14,7 +14,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.Handler, authHandler *auth.Handler, refererMiddleware *middleware.RefererMiddleware, jwtMiddleware *middleware.JWTMiddleware) {
+func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.Handler, authHandler *auth.Handler, refererMiddleware *middleware.RefererMiddleware, jwtMiddleware *middleware.JWTMiddleware) *gin.Engine {
 	docs.SwaggerInfo.Title = "URL Shortener API"
 	docs.SwaggerInfo.Description = "API for shortening and managing URLs"
 	docs.SwaggerInfo.Version = "1.0"
@@ -66,5 +66,7 @@ func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.H
 			urls.POST("/urls/search", urlHandler.FindByOriginalURL)
 		}
 	}
+
+	return r
 
 }

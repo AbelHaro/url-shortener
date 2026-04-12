@@ -40,14 +40,16 @@ func NewService(rangeSvc *idsRangesService.Service) (*Service, error) {
 	return svc, nil
 }
 
+// NextBase62 generates the next unique ID in base62 encoding. It uses an atomic counter to ensure thread safety and checks if the current counter value exceeds the allocated range. If it does, it allocates a new range and updates the counter accordingly. The generated ID is then encrypted using a Feistel cipher to add an extra layer of obfuscation before being converted to base62.
 func (svc *Service) NextBase62() (string, error) {
 
 	svc.mu.Lock()
-	defer svc.mu.Unlock()
 	newVal := atomic.AddInt64(&svc.counter, 1)
+	// Check if the new value exceeds the allocated range. If it does, allocate a new range and update the counter accordingly. Do this in a thread-safe way to avoid race conditions and ensure that only one goroutine can allocate a new range at a time.
 	if newVal >= int64(svc.IDsRange.Last) {
 		rangeAllocated, err := svc.rangeSvc.AllocateRange()
 		if err != nil {
+			svc.mu.Unlock()
 			return "", err
 		}
 		if rangeAllocated != nil {
@@ -55,6 +57,7 @@ func (svc *Service) NextBase62() (string, error) {
 			svc.IDsRange = rangeAllocated
 			newVal = atomic.AddInt64(&svc.counter, 1)
 		} else {
+			svc.mu.Unlock()
 			return "", err
 		}
 	}

@@ -20,6 +20,10 @@ type PostgresRepository struct {
 func NewPostgresRepository(db *gorm.DB) Repository {
 	return &PostgresRepository{db: db}
 }
+
+/*
+AllocateRange allocates a new range of IDs for the service. It first checks if there is an active range that can be used, and if so, it updates the offset of that range to avoid duplicating IDs. If there is no active range, it allocates a new range. This method is designed to be idempotent, so if the client is recovering from a failure, it can call this method again without risking ID duplication.
+*/
 func (p *PostgresRepository) AllocateRange() (*domain.IDsRange, error) {
 	ctx := context.Background()
 

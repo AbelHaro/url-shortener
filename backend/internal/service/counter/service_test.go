@@ -23,7 +23,7 @@ func TestService_GenerateShortHash(t *testing.T) {
 
 	hashes := make(map[string]bool)
 
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		hash, err := svc.GenerateShortHash()
 
 		if i%10 == 0 {
