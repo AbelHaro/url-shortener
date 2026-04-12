@@ -84,7 +84,7 @@ func TestHandler_Redirect(t *testing.T) {
 		t.Fatalf("provideHandler() error = %v", err)
 	}
 
-	urlStored, err := h.Service.Store("https://google.com")
+	urlStored, err := h.Service.Store("https://google.com", uuid.New())
 	if err != nil {
 		t.Fatalf("Service.Store() error = %v", err)
 	}
@@ -131,7 +131,7 @@ func TestHandler_FindByID(t *testing.T) {
 		t.Fatalf("provideHandler() error = %v", err)
 	}
 
-	urlStored, err := h.Service.Store("https://google.com")
+	urlStored, err := h.Service.Store("https://google.com", uuid.New())
 	if err != nil {
 		t.Fatalf("Service.Store() error = %v", err)
 	}
@@ -182,7 +182,7 @@ func TestHandler_DeleteByID(t *testing.T) {
 		t.Fatalf("provideHandler() error = %v", err)
 	}
 
-	urlStored, err := h.Service.Store("https://google.com")
+	urlStored, err := h.Service.Store("https://google.com", uuid.New())
 	if err != nil {
 		t.Fatalf("Service.Store() error = %v", err)
 	}
@@ -228,7 +228,7 @@ func TestHandler_FindByOriginalURL(t *testing.T) {
 		t.Fatalf("provideHandler() error = %v", err)
 	}
 
-	_, err = h.Service.Store("https://google.com")
+	_, err = h.Service.Store("https://google.com", uuid.New())
 	if err != nil {
 		t.Fatalf("Service.Store() error = %v", err)
 	}
