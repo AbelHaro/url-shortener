@@ -1,17 +1,28 @@
 package http
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/AbelHaro/url-shortener/backend/docs"
+	"github.com/AbelHaro/url-shortener/backend/internal/config"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/auth"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/health"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/middleware"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/url"
+	authRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/auth"
+	idrangesRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/idsranges"
+	urlRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/url"
+	authSvc "github.com/AbelHaro/url-shortener/backend/internal/service/auth"
+	counterSvc "github.com/AbelHaro/url-shortener/backend/internal/service/counter"
+	idrangesSvc "github.com/AbelHaro/url-shortener/backend/internal/service/idsranges"
+	jwtSvc "github.com/AbelHaro/url-shortener/backend/internal/service/jwt"
+	urlSvc "github.com/AbelHaro/url-shortener/backend/internal/service/url"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"gorm.io/gorm"
 )
 
 func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.Handler, authHandler *auth.Handler, refererMiddleware *middleware.RefererMiddleware, jwtMiddleware *middleware.JWTMiddleware) *gin.Engine {
@@ -69,4 +80,39 @@ func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.H
 
 	return r
 
+}
+
+// NewConfiguredRouter creates and configures a Gin router with all handlers, middleware, and services
+// initialized using the provided database connection and JWT configuration
+func NewConfiguredRouter(db *gorm.DB, appConfig *config.AppConfig) (*gin.Engine, error) {
+	router := gin.Default()
+
+	// Initialize repositories
+	urlRepoInstance := urlRepo.NewPostgresRepository(db)
+	authRepoInstance := authRepo.NewPostgresRepository(db)
+	idrangesRepoInstance := idrangesRepo.NewPostgresRepository(db)
+
+	// Initialize services
+	idrangesSvcInstance := idrangesSvc.NewService(idrangesRepoInstance)
+
+	counterService, err := counterSvc.NewService(idrangesSvcInstance)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize counter service: %w", err)
+	}
+
+	urlService := urlSvc.NewService(urlRepoInstance, counterService)
+	jwtService := jwtSvc.NewService(appConfig.JWTSecret, appConfig.AccessTTL, appConfig.RefreshTTL)
+	authService := authSvc.NewService(authRepoInstance, jwtService)
+
+	// Initialize handlers and middleware
+	urlHandler := url.NewHandler(urlService)
+	healthHandler := health.NewHandler()
+	authHandler := auth.NewHandler(authService)
+	refererMiddleware := middleware.NewRefererMiddleware()
+	jwtMiddleware := middleware.NewJWTMiddleware(authService)
+
+	// Setup routes
+	SetupRoutes(router, urlHandler, healthHandler, authHandler, refererMiddleware, jwtMiddleware)
+
+	return router, nil
 }

@@ -34,24 +34,24 @@ func NewHandler(svc *url.Service) *Handler {
 // @Produce json
 // @Param request body dtos.V1CreateShortenRequest true "Request body"
 // @Success 201 {object} domain.URL
-// @Failure 400 {object} dtos.ErrorResponse
+// @Failure 400 {object} dtos.V1ErrorResponse
 // @Router /shorten [post]
 func (h *Handler) Create(c *gin.Context) {
 
 	ownerIDRaw, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "user not authenticated"})
+		c.JSON(http.StatusUnauthorized, dtos.V1ErrorResponse{Error: "user not authenticated"})
 		return
 	}
 
 	ownerID, ok := ownerIDRaw.(uuid.UUID)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "invalid user ID type"})
+		c.JSON(http.StatusUnauthorized, dtos.V1ErrorResponse{Error: "invalid user ID type"})
 		return
 	}
 
 	if ownerID == uuid.Nil {
-		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "invalid user ID"})
+		c.JSON(http.StatusUnauthorized, dtos.V1ErrorResponse{Error: "invalid user ID"})
 		return
 	}
 
@@ -59,7 +59,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Println(err)
-		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: "invalid request body"})
+		c.JSON(http.StatusBadRequest, dtos.V1ErrorResponse{Error: "invalid request body"})
 		return
 	}
 
@@ -98,7 +98,7 @@ func (h *Handler) Redirect(c *gin.Context) {
 // @Produce json
 // @Param id path string true "URL ID"
 // @Success 200 {object} domain.URL
-// @Failure 404 {object} dtos.ErrorResponse
+// @Failure 404 {object} dtos.V1ErrorResponse
 // @Router /urls/{id} [get]
 func (h *Handler) FindByID(c *gin.Context) {
 	id := c.Param("id")
@@ -119,7 +119,7 @@ func (h *Handler) FindByID(c *gin.Context) {
 // @Produce json
 // @Param shortCode path string true "Short Code"
 // @Success 200 {object} domain.URL
-// @Failure 404 {object} dtos.ErrorResponse
+// @Failure 404 {object} dtos.V1ErrorResponse
 // @Router /urls/short/{shortCode} [get]
 func (h *Handler) FindByShortCode(c *gin.Context) {
 	shortCode := c.Param("shortCode")
@@ -139,7 +139,7 @@ func (h *Handler) FindByShortCode(c *gin.Context) {
 // @Tags URLs
 // @Param id path string true "URL ID"
 // @Success 204
-// @Failure 404 {object} dtos.ErrorResponse
+// @Failure 404 {object} dtos.V1ErrorResponse
 // @Router /urls/{id} [delete]
 func (h *Handler) DeleteByID(c *gin.Context) {
 	id := c.Param("id")
@@ -161,13 +161,13 @@ func (h *Handler) DeleteByID(c *gin.Context) {
 // @Produce json
 // @Param request body dtos.V1SearchByOriginalURLRequest true "Request body"
 // @Success 200 {object} domain.URL
-// @Failure 404 {object} dtos.ErrorResponse
+// @Failure 404 {object} dtos.V1ErrorResponse
 // @Router /urls/search [post]
 func (h *Handler) FindByOriginalURL(c *gin.Context) {
 	var req dtos.V1SearchByOriginalURLRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: "invalid request body"})
+		c.JSON(http.StatusBadRequest, dtos.V1ErrorResponse{Error: "invalid request body"})
 		return
 	}
 
@@ -178,7 +178,7 @@ func (h *Handler) FindByOriginalURL(c *gin.Context) {
 	}
 
 	if urlFound == nil {
-		c.JSON(http.StatusNotFound, dtos.ErrorResponse{Error: "url not found"})
+		c.JSON(http.StatusNotFound, dtos.V1ErrorResponse{Error: "url not found"})
 		return
 	}
 
@@ -188,10 +188,10 @@ func (h *Handler) FindByOriginalURL(c *gin.Context) {
 func (h *Handler) handleError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrURLNotFound):
-		c.JSON(http.StatusNotFound, dtos.ErrorResponse{Error: err.Error()})
+		c.JSON(http.StatusNotFound, dtos.V1ErrorResponse{Error: err.Error()})
 	case errors.Is(err, domain.ErrInvalidURL):
-		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: err.Error()})
+		c.JSON(http.StatusBadRequest, dtos.V1ErrorResponse{Error: err.Error()})
 	default:
-		c.JSON(http.StatusInternalServerError, dtos.ErrorResponse{Error: "internal server error"})
+		c.JSON(http.StatusInternalServerError, dtos.V1ErrorResponse{Error: "internal server error"})
 	}
 }
