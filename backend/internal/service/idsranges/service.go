@@ -16,6 +16,9 @@ func NewService(repo idsranges.Repository) *Service {
 	return &Service{repo: repo}
 }
 
+/*
+AllocateRange allocates a new range of IDs for the service. It first checks if there is an active range that can be used, and if so, it updates the offset of that range to avoid duplicating IDs. If there is no active range, it allocates a new range. This method is designed to be idempotent, so if the client is recovering from a failure, it can call this method again without risking ID duplication.
+*/
 func (s *Service) AllocateRange() (*domain.IDsRange, error) {
 	rangeFound, err := s.repo.GetActiveRange()
 

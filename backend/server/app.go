@@ -54,11 +54,6 @@ func NewApp() *App {
 
 	urlService := urlSvc.NewService(urlRepoInstance, counterService)
 
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		log.Fatal("JWT_SECRET environment variable is required")
-	}
-
 	accessTTLStr := os.Getenv("JWT_ACCESS_TOKEN_TTL")
 	if accessTTLStr == "" {
 		accessTTLStr = "15m"
@@ -77,7 +72,7 @@ func NewApp() *App {
 		log.Fatalf("Invalid JWT_REFRESH_TOKEN_TTL format: %v", err)
 	}
 
-	jwtService := jwtSvc.NewService(jwtSecret, accessTTL, refreshTTL)
+	jwtService := jwtSvc.NewService(cfg.JWTSecret, accessTTL, refreshTTL)
 
 	authService := authSvc.NewService(authRepoInstance, jwtService)
 

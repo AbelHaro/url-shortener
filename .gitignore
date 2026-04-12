@@ -14,3 +14,5 @@ TODO.md
 /backend/tmp
 /backend/api
 /tmp
+.agents
+skills-lock.json
