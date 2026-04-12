@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/config"
+	"github.com/AbelHaro/url-shortener/backend/internal/domain"
 	"github.com/AbelHaro/url-shortener/backend/internal/dtos"
 	"github.com/AbelHaro/url-shortener/backend/internal/infrastructure/database"
 	"github.com/gin-gonic/gin"
@@ -105,6 +106,133 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// ============= HELPER FUNCTIONS =============
+
+// cleanupDatabase truncates all tables to ensure clean state between tests
+func cleanupDatabase(t *testing.T) {
+	if err := testDB.Exec("TRUNCATE TABLE urls CASCADE").Error; err != nil {
+		t.Fatalf("failed to truncate urls table: %v", err)
+	}
+	if err := testDB.Exec("TRUNCATE TABLE users CASCADE").Error; err != nil {
+		t.Fatalf("failed to truncate users table: %v", err)
+	}
+	if err := testDB.Exec("TRUNCATE TABLE ids_ranges CASCADE").Error; err != nil {
+		t.Fatalf("failed to truncate ids_ranges table: %v", err)
+	}
+}
+
+// registerUserHelper registers a new user and returns the response
+func registerUserHelper(email, password string) (*dtos.V1UserResponse, error) {
+	registerBody := dtos.V1RegisterRequest{Email: email, Password: password}
+	body, _ := json.Marshal(registerBody)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/v1/auth/register", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Referer", "http://localhost:5173/")
+
+	testRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		var errResp dtos.V1ErrorResponse
+		json.Unmarshal(w.Body.Bytes(), &errResp)
+		return nil, fmt.Errorf("registration failed with status %d: %s", w.Code, errResp.Error)
+	}
+
+	var userResp dtos.V1UserResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &userResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal registration response: %w", err)
+	}
+
+	return &userResp, nil
+}
+
+// loginUserHelper logs in a user and returns the token response
+func loginUserHelper(email, password string) (*dtos.V1TokenResponse, error) {
+	loginBody := dtos.V1LoginRequest{Email: email, Password: password}
+	body, _ := json.Marshal(loginBody)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Referer", "http://localhost:5173/")
+
+	testRouter.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		var errResp dtos.V1ErrorResponse
+		json.Unmarshal(w.Body.Bytes(), &errResp)
+		return nil, fmt.Errorf("login failed with status %d: %s", w.Code, errResp.Error)
+	}
+
+	var tokenResp dtos.V1TokenResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &tokenResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal login response: %w", err)
+	}
+
+	return &tokenResp, nil
+}
+
+// makeRequest performs a request without authentication
+func makeRequest(method, url string, body interface{}) *httptest.ResponseRecorder {
+	var bodyReader *bytes.Reader
+	if body != nil {
+		bodyBytes, _ := json.Marshal(body)
+		bodyReader = bytes.NewReader(bodyBytes)
+	} else {
+		bodyReader = bytes.NewReader([]byte{})
+	}
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(method, url, bodyReader)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Referer", "http://localhost:5173/")
+
+	testRouter.ServeHTTP(w, req)
+	return w
+}
+
+// makeAuthenticatedRequest performs a request with JWT token in Authorization header
+func makeAuthenticatedRequest(method, url string, body interface{}, token string) *httptest.ResponseRecorder {
+	var bodyReader *bytes.Reader
+	if body != nil {
+		bodyBytes, _ := json.Marshal(body)
+		bodyReader = bytes.NewReader(bodyBytes)
+	} else {
+		bodyReader = bytes.NewReader([]byte{})
+	}
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(method, url, bodyReader)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Referer", "http://localhost:5173/")
+
+	testRouter.ServeHTTP(w, req)
+	return w
+}
+
+// createShortenURLHelper creates a shortened URL and returns the response
+func createShortenURLHelper(originalURL string, token string) (*dtos.V1URLResponse, error) {
+	createReq := dtos.V1CreateShortenRequest{OriginalUrl: originalURL}
+	w := makeAuthenticatedRequest("POST", "/api/v1/shorten", createReq, token)
+
+	if w.Code != http.StatusCreated {
+		var errResp dtos.V1ErrorResponse
+		json.Unmarshal(w.Body.Bytes(), &errResp)
+		return nil, fmt.Errorf("create shorten failed with status %d: %s", w.Code, errResp.Error)
+	}
+
+	var urlResp dtos.V1URLResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &urlResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal create shorten response: %w", err)
+	}
+
+	return &urlResp, nil
+}
+
+// ============= TEST FUNCTIONS =============
+
 func Test_HealthEndpoint(t *testing.T) {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/health", nil)
@@ -118,6 +246,7 @@ func Test_HealthEndpoint(t *testing.T) {
 }
 
 func Test_RegisterEndpoint(t *testing.T) {
+	cleanupDatabase(t)
 
 	tests := []struct {
 		name                 string
@@ -191,16 +320,11 @@ func Test_RegisterEndpoint(t *testing.T) {
 }
 
 func Test_LoginEndpoint(t *testing.T) {
-	// First, register a user to ensure we have valid credentials for login
-	registerBody := dtos.V1RegisterRequest{Email: "test@example.com", Password: "password123"}
-	registerBodyBytes, _ := json.Marshal(registerBody)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("POST", "/api/v1/auth/register", bytes.NewReader(registerBodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", "http://localhost:5173/")
-	testRouter.ServeHTTP(w, req)
+	cleanupDatabase(t)
 
-	assert.Equal(t, http.StatusCreated, w.Code)
+	// First, register a user to ensure we have valid credentials for login
+	_, err := registerUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
 
 	tests := []struct {
 		name                 string
@@ -305,29 +429,14 @@ func Test_LoginEndpoint(t *testing.T) {
 }
 
 func Test_RefreshTokenEndpoint(t *testing.T) {
-	// First, register and login a user to get a valid refresh token
-	registerBody := dtos.V1RegisterRequest{Email: "test@example.com", Password: "password123"}
-	registerBodyBytes, _ := json.Marshal(registerBody)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("POST", "/api/v1/auth/register", bytes.NewReader(registerBodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", "http://localhost:5173/")
-	testRouter.ServeHTTP(w, req)
+	cleanupDatabase(t)
 
-	assert.Equal(t, http.StatusCreated, w.Code)
+	// Setup: Register and login user
+	_, err := registerUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
 
-	loginBody := dtos.V1LoginRequest{Email: "test@example.com", Password: "password123"}
-	loginBodyBytes, _ := json.Marshal(loginBody)
-	w = httptest.NewRecorder()
-	req, _ = http.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(loginBodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", "http://localhost:5173/")
-	testRouter.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var loginResp dtos.V1TokenResponse
-	json.Unmarshal(w.Body.Bytes(), &loginResp)
+	loginResp, err := loginUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
 
 	tests := []struct {
 		name                 string
@@ -389,29 +498,14 @@ func Test_RefreshTokenEndpoint(t *testing.T) {
 }
 
 func Test_LogoutEndpoint(t *testing.T) {
-	// First, register and login a user to get a valid access token
-	registerBody := dtos.V1RegisterRequest{Email: "test@example.com", Password: "password123"}
-	registerBodyBytes, _ := json.Marshal(registerBody)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("POST", "/api/v1/auth/register", bytes.NewReader(registerBodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", "http://localhost:5173/")
-	testRouter.ServeHTTP(w, req)
+	cleanupDatabase(t)
 
-	assert.Equal(t, http.StatusCreated, w.Code)
+	// Setup: Register and login user
+	_, err := registerUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
 
-	loginBody := dtos.V1LoginRequest{Email: "test@example.com", Password: "password123"}
-	loginBodyBytes, _ := json.Marshal(loginBody)
-	w = httptest.NewRecorder()
-	req, _ = http.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(loginBodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", "http://localhost:5173/")
-	testRouter.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var loginResp dtos.V1TokenResponse
-	json.Unmarshal(w.Body.Bytes(), &loginResp)
+	loginResp, err := loginUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
 
 	tests := []struct {
 		name           string
@@ -460,35 +554,16 @@ func Test_LogoutEndpoint(t *testing.T) {
 }
 
 func Test_ShortenEndpoint(t *testing.T) {
-	// First, register and login a user to get a valid access token
-	registerBody := dtos.V1RegisterRequest{Email: "test@example.com", Password: "password123"}
-	registerBodyBytes, _ := json.Marshal(registerBody)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("POST", "/api/v1/auth/register", bytes.NewReader(registerBodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", "http://localhost:5173/")
-	testRouter.ServeHTTP(w, req)
+	cleanupDatabase(t)
 
-	assert.Equal(t, http.StatusCreated, w.Code)
+	// Setup: Register and login user
+	userResp, err := registerUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
 
-	registerResponse := dtos.V1UserResponse{}
-	json.Unmarshal(w.Body.Bytes(), &registerResponse)
+	loginResp, err := loginUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
 
-	loginBody := dtos.V1LoginRequest{Email: "test@example.com", Password: "password123"}
-	loginBodyBytes, _ := json.Marshal(loginBody)
-	w = httptest.NewRecorder()
-	req, _ = http.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(loginBodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", "http://localhost:5173/")
-	testRouter.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var loginResp dtos.V1TokenResponse
-	json.Unmarshal(w.Body.Bytes(), &loginResp)
-
-	// Parse the user ID from the registration response
-	userID := uuid.MustParse(registerResponse.ID)
+	userID := uuid.MustParse(userResp.ID)
 
 	tests := []struct {
 		name                 string
@@ -569,6 +644,366 @@ func Test_ShortenEndpoint(t *testing.T) {
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.Equal(t, expected.Error, resp.Error)
+			}
+		})
+	}
+}
+
+func Test_FindByShortCodeEndpoint(t *testing.T) {
+	cleanupDatabase(t)
+
+	// Setup: Register, login, and create a shortened URL
+	_, err := registerUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	loginResp, err := loginUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.AccessToken)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		method         string
+		url            string
+		shortCode      string
+		accessToken    string
+		expectedStatus int
+		assertions     func(t *testing.T, w *httptest.ResponseRecorder)
+	}{
+		{
+			name:           "Valid short code",
+			method:         "GET",
+			url:            "/api/v1/urls/short/",
+			shortCode:      urlResp.ShortCode,
+			accessToken:    loginResp.AccessToken,
+			expectedStatus: http.StatusOK,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp domain.URL
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, "https://www.example.com", resp.OriginalURL)
+				assert.Equal(t, urlResp.ShortCode, resp.ShortCode)
+			},
+		},
+		{
+			name:           "Invalid short code",
+			method:         "GET",
+			url:            "/api/v1/urls/short/",
+			shortCode:      "invalidcode",
+			accessToken:    loginResp.AccessToken,
+			expectedStatus: http.StatusNotFound,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp dtos.V1ErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.NotEmpty(t, resp.Error)
+			},
+		},
+		{
+			name:           "Missing authentication token",
+			method:         "GET",
+			url:            "/api/v1/urls/short/",
+			shortCode:      urlResp.ShortCode,
+			accessToken:    "",
+			expectedStatus: http.StatusUnauthorized,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp dtos.V1ErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				// The middleware returns "Invalid token" when no auth header is provided
+				assert.True(t, resp.Error == "Authorization header required" || resp.Error == "Invalid token")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fullURL := tt.url + tt.shortCode
+			w := makeAuthenticatedRequest(tt.method, fullURL, nil, tt.accessToken)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.assertions != nil {
+				tt.assertions(t, w)
+			}
+		})
+	}
+}
+
+func Test_FindByIDEndpoint(t *testing.T) {
+	cleanupDatabase(t)
+
+	// Setup: Register, login, and create a shortened URL
+	_, err := registerUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	loginResp, err := loginUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.AccessToken)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		method         string
+		url            string
+		id             string
+		accessToken    string
+		expectedStatus int
+		assertions     func(t *testing.T, w *httptest.ResponseRecorder)
+	}{
+		{
+			name:           "Valid URL ID",
+			method:         "GET",
+			url:            "/api/v1/urls/",
+			id:             urlResp.ID.String(),
+			accessToken:    loginResp.AccessToken,
+			expectedStatus: http.StatusOK,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp domain.URL
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, "https://www.example.com", resp.OriginalURL)
+			},
+		},
+		{
+			name:           "Invalid URL ID (non-existent)",
+			method:         "GET",
+			url:            "/api/v1/urls/",
+			id:             uuid.New().String(),
+			accessToken:    loginResp.AccessToken,
+			expectedStatus: http.StatusNotFound,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp dtos.V1ErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.NotEmpty(t, resp.Error)
+			},
+		},
+		{
+			name:           "Invalid UUID format returns 500 (backend behavior)",
+			method:         "GET",
+			url:            "/api/v1/urls/",
+			id:             "invalid-uuid",
+			accessToken:    loginResp.AccessToken,
+			expectedStatus: http.StatusInternalServerError,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp dtos.V1ErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.NotEmpty(t, resp.Error)
+			},
+		},
+		{
+			name:           "Missing authentication token",
+			method:         "GET",
+			url:            "/api/v1/urls/",
+			id:             urlResp.ID.String(),
+			accessToken:    "",
+			expectedStatus: http.StatusUnauthorized,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp dtos.V1ErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				// The middleware returns "Invalid token" when no auth header is provided
+				assert.True(t, resp.Error == "Authorization header required" || resp.Error == "Invalid token")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fullURL := tt.url + tt.id
+			w := makeAuthenticatedRequest(tt.method, fullURL, nil, tt.accessToken)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.assertions != nil {
+				tt.assertions(t, w)
+			}
+		})
+	}
+}
+
+func Test_DeleteByIDEndpoint(t *testing.T) {
+	cleanupDatabase(t)
+
+	// Setup: Register, login, and create a shortened URL (User 1)
+	_, err := registerUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	loginResp, err := loginUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.AccessToken)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		method         string
+		url            string
+		id             string
+		accessToken    string
+		expectedStatus int
+		assertions     func(t *testing.T, w *httptest.ResponseRecorder)
+	}{
+		{
+			name:           "Valid delete (owner)",
+			method:         "DELETE",
+			url:            "/api/v1/urls/",
+			id:             urlResp.ID.String(),
+			accessToken:    loginResp.AccessToken,
+			expectedStatus: http.StatusNoContent,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				// After deletion, verify URL doesn't exist
+				verifyW := makeAuthenticatedRequest("GET", "/api/v1/urls/"+urlResp.ID.String(), nil, loginResp.AccessToken)
+				assert.Equal(t, http.StatusNotFound, verifyW.Code)
+			},
+		},
+		{
+			name:           "Delete non-existent URL",
+			method:         "DELETE",
+			url:            "/api/v1/urls/",
+			id:             uuid.New().String(),
+			accessToken:    loginResp.AccessToken,
+			expectedStatus: http.StatusNotFound,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp dtos.V1ErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.NotEmpty(t, resp.Error)
+			},
+		},
+		{
+			name:           "Missing authentication token",
+			method:         "DELETE",
+			url:            "/api/v1/urls/",
+			id:             urlResp.ID.String(),
+			accessToken:    "",
+			expectedStatus: http.StatusUnauthorized,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp dtos.V1ErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				// The middleware returns "Invalid token" when no auth header is provided
+				assert.True(t, resp.Error == "Authorization header required" || resp.Error == "Invalid token")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fullURL := tt.url + tt.id
+			w := makeAuthenticatedRequest(tt.method, fullURL, nil, tt.accessToken)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.assertions != nil {
+				tt.assertions(t, w)
+			}
+		})
+	}
+}
+
+func Test_SearchByOriginalURLEndpoint(t *testing.T) {
+	cleanupDatabase(t)
+
+	// Setup: Register, login, and create a shortened URL
+	_, err := registerUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	loginResp, err := loginUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.AccessToken)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		method         string
+		url            string
+		requestBody    dtos.V1SearchByOriginalURLRequest
+		accessToken    string
+		expectedStatus int
+		assertions     func(t *testing.T, w *httptest.ResponseRecorder)
+	}{
+		{
+			name:   "Valid search by original URL",
+			method: "POST",
+			url:    "/api/v1/urls/search",
+			requestBody: dtos.V1SearchByOriginalURLRequest{
+				URL: "https://www.example.com",
+			},
+			accessToken:    loginResp.AccessToken,
+			expectedStatus: http.StatusOK,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp domain.URL
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, "https://www.example.com", resp.OriginalURL)
+				assert.Equal(t, urlResp.ShortCode, resp.ShortCode)
+			},
+		},
+		{
+			name:   "Search for non-existent URL returns 500 (backend behavior)",
+			method: "POST",
+			url:    "/api/v1/urls/search",
+			requestBody: dtos.V1SearchByOriginalURLRequest{
+				URL: "https://nonexistent.com",
+			},
+			accessToken:    loginResp.AccessToken,
+			expectedStatus: http.StatusInternalServerError,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp dtos.V1ErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, "internal server error", resp.Error)
+			},
+		},
+		{
+			name:   "Invalid request body (missing URL)",
+			method: "POST",
+			url:    "/api/v1/urls/search",
+			requestBody: dtos.V1SearchByOriginalURLRequest{
+				URL: "",
+			},
+			accessToken:    loginResp.AccessToken,
+			expectedStatus: http.StatusBadRequest,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp dtos.V1ErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, "invalid request body", resp.Error)
+			},
+		},
+		{
+			name:   "Missing authentication token",
+			method: "POST",
+			url:    "/api/v1/urls/search",
+			requestBody: dtos.V1SearchByOriginalURLRequest{
+				URL: "https://www.example.com",
+			},
+			accessToken:    "",
+			expectedStatus: http.StatusUnauthorized,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp dtos.V1ErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				// The middleware returns "Invalid token" when no auth header is provided
+				assert.True(t, resp.Error == "Authorization header required" || resp.Error == "Invalid token")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := makeAuthenticatedRequest(tt.method, tt.url, tt.requestBody, tt.accessToken)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.assertions != nil {
+				tt.assertions(t, w)
 			}
 		})
 	}
