@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 )
 
 type DBConfig struct {
@@ -23,12 +24,24 @@ type AppConfig struct {
 	Host        string
 	Port        string
 	JWTSecret   string
-	AccessTTL   string
-	RefreshTTL  string
+	AccessTTL   time.Duration
+	RefreshTTL  time.Duration
 	Production  bool
 }
 
 func LoadConfig() (*AppConfig, error) {
+	accessTTLStr := getEnvOrDefault("JWT_ACCESS_TOKEN_TTL", "15m")
+	accessTTL, err := time.ParseDuration(accessTTLStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid JWT_ACCESS_TOKEN_TTL format: %w", err)
+	}
+
+	refreshTTLStr := getEnvOrDefault("JWT_REFRESH_TOKEN_TTL", "168h")
+	refreshTTL, err := time.ParseDuration(refreshTTLStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid JWT_REFRESH_TOKEN_TTL format: %w", err)
+	}
+
 	cfg := &AppConfig{
 		DBConfig: DBConfig{
 			Host:     getEnv("DB_HOST"),
@@ -44,8 +57,8 @@ func LoadConfig() (*AppConfig, error) {
 		Host:       getEnv("APP_HOST"),
 		Port:       getEnv("APP_PORT"),
 		JWTSecret:  getEnv("JWT_SECRET"),
-		AccessTTL:  getEnv("JWT_ACCESS_TOKEN_TTL"),
-		RefreshTTL: getEnv("JWT_REFRESH_TOKEN_TTL"),
+		AccessTTL:  accessTTL,
+		RefreshTTL: refreshTTL,
 		Production: getEnv("PRODUCTION") == "true",
 	}
 	return cfg, nil
@@ -56,6 +69,13 @@ func getEnv(key string) string {
 		return value
 	}
 	panic(fmt.Sprintf("environment variable %s not set", key))
+}
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 func (cfg *AppConfig) DSN() string {
