@@ -1,22 +1,22 @@
-package rangeservice
+package idsranges
 
 import (
 	"fmt"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
-	rangerepository "github.com/AbelHaro/url-shortener/backend/internal/repository/range"
+	"github.com/AbelHaro/url-shortener/backend/internal/repository/idsranges"
 	"github.com/google/uuid"
 )
 
 type Service struct {
-	repo rangerepository.Repository
+	repo idsranges.Repository
 }
 
-func NewService(repo rangerepository.Repository) *Service {
+func NewService(repo idsranges.Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) AllocateRange() (*domain.Range, error) {
+func (s *Service) AllocateRange() (*domain.IDsRange, error) {
 	rangeFound, err := s.repo.GetActiveRange()
 
 	fmt.Printf("Error when getting active range: %v\n", err)

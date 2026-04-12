@@ -3,20 +3,24 @@ package url
 import (
 	"testing"
 
-	counterRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/counter"
+	idsRangesRepository "github.com/AbelHaro/url-shortener/backend/internal/repository/idsranges"
 	"github.com/AbelHaro/url-shortener/backend/internal/repository/url"
-	counterSvc "github.com/AbelHaro/url-shortener/backend/internal/service/counter"
+	counterService "github.com/AbelHaro/url-shortener/backend/internal/service/counter"
+	idsRangesService "github.com/AbelHaro/url-shortener/backend/internal/service/idsranges"
 	"github.com/google/uuid"
 )
 
 func provideService() (*Service, error) {
 	repo := url.NewMockRepository()
-	counterRepoInstance := counterRepo.NewMockRepository()
-	counterSvcInstance, err := counterSvc.NewService(counterRepoInstance)
+	idsRangesRepository := idsRangesRepository.NewMockRepository()
+	idsRangesService := idsRangesService.NewService(idsRangesRepository)
+	counterService, err := counterService.NewService(idsRangesService)
+
 	if err != nil {
 		return nil, err
 	}
-	return NewService(repo, counterSvcInstance), nil
+
+	return NewService(repo, counterService), nil
 }
 
 func TestService_Store(t *testing.T) {

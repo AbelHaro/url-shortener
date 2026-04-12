@@ -10,6 +10,9 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// Ensure PostgresRepository implements the Repository interface
+var _ Repository = (*PostgresRepository)(nil)
+
 type PostgresRepository struct {
 	db *gorm.DB
 }

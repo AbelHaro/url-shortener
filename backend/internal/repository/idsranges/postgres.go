@@ -1,4 +1,4 @@
-package rangerepository
+package idsranges
 
 import (
 	"context"
@@ -20,10 +20,10 @@ type PostgresRepository struct {
 func NewPostgresRepository(db *gorm.DB) Repository {
 	return &PostgresRepository{db: db}
 }
-func (p *PostgresRepository) AllocateRange() (*domain.Range, error) {
+func (p *PostgresRepository) AllocateRange() (*domain.IDsRange, error) {
 	ctx := context.Background()
 
-	var rangeAllocated *domain.Range
+	var rangeAllocated *domain.IDsRange
 
 	err := p.db.Transaction(func(tx *gorm.DB) error {
 
@@ -36,20 +36,20 @@ func (p *PostgresRepository) AllocateRange() (*domain.Range, error) {
 			return err
 		}
 
-		rangeToAllocate := &domain.Range{
+		rangeToAllocate := &domain.IDsRange{
 			ID:            uuid.New(),
 			Start:         lastRange,
 			Last:          lastRange + RANGE_SIZE, // The end is not inclusive, so we can allocate the next range starting from lastRange + RANGE_SIZE
 			CurrentOffset: 0,
 		}
 
-		err = gorm.G[domain.Range](p.db).Create(ctx, rangeToAllocate)
+		err = gorm.G[domain.IDsRange](p.db).Create(ctx, rangeToAllocate)
 
 		if err != nil {
 			return domain.ErrRangeAllocFailed
 		}
 
-		record, err := gorm.G[domain.Range](p.db).Where("id = ?", rangeToAllocate.ID).First(ctx)
+		record, err := gorm.G[domain.IDsRange](p.db).Where("id = ?", rangeToAllocate.ID).First(ctx)
 
 		if err != nil {
 			return domain.ErrRangeNotFound
@@ -71,7 +71,7 @@ func (p *PostgresRepository) UpdateRangeOffset(rangeID uuid.UUID) error {
 
 	err := p.db.Transaction(func(tx *gorm.DB) error {
 
-		rangeToBeUpdated, err := gorm.G[domain.Range](p.db).Where("id = ?", rangeID).First(ctx)
+		rangeToBeUpdated, err := gorm.G[domain.IDsRange](p.db).Where("id = ?", rangeID).First(ctx)
 		if err != nil {
 			return domain.ErrRangeNotFound
 		}
@@ -87,7 +87,7 @@ func (p *PostgresRepository) UpdateRangeOffset(rangeID uuid.UUID) error {
 			return domain.ErrInvalidRange
 		}
 
-		rowsAffected, err := gorm.G[domain.Range](p.db).Where("id = ?", rangeID).Update(ctx, "current_offset", rangeToBeUpdated.CurrentOffset+RANGE_OFFSET)
+		rowsAffected, err := gorm.G[domain.IDsRange](p.db).Where("id = ?", rangeID).Update(ctx, "current_offset", rangeToBeUpdated.CurrentOffset+RANGE_OFFSET)
 		if err != nil {
 			return domain.ErrRangeNotFound
 		}
@@ -103,7 +103,7 @@ func (p *PostgresRepository) UpdateRangeOffset(rangeID uuid.UUID) error {
 func (p *PostgresRepository) GetNextRangeAvailable() (lastRange uint64, err error) {
 	ctx := context.Background()
 
-	rangeRecord, err := gorm.G[domain.Range](p.db).Last(ctx)
+	rangeRecord, err := gorm.G[domain.IDsRange](p.db).Last(ctx)
 	if err != nil {
 		fmt.Printf("Error fetching last range: %v", err)
 		if err == gorm.ErrRecordNotFound {
@@ -115,10 +115,10 @@ func (p *PostgresRepository) GetNextRangeAvailable() (lastRange uint64, err erro
 	return rangeRecord.Last, nil
 }
 
-func (p *PostgresRepository) GetActiveRange() (*domain.Range, error) {
+func (p *PostgresRepository) GetActiveRange() (*domain.IDsRange, error) {
 	ctx := context.Background()
 
-	activeRange, err := gorm.G[domain.Range](p.db).Where(`start + current_offset < last`).Take(ctx)
+	activeRange, err := gorm.G[domain.IDsRange](p.db).Where(`start + current_offset < last`).Take(ctx)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}

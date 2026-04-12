@@ -14,12 +14,12 @@ import (
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/url"
 	"github.com/AbelHaro/url-shortener/backend/internal/infrastructure/database"
 	authRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/auth"
-	rangeRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/range"
+	idrangesRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/idsranges"
 	urlRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/url"
 	authSvc "github.com/AbelHaro/url-shortener/backend/internal/service/auth"
 	counterSvc "github.com/AbelHaro/url-shortener/backend/internal/service/counter"
+	idrangesSvc "github.com/AbelHaro/url-shortener/backend/internal/service/idsranges"
 	jwtSvc "github.com/AbelHaro/url-shortener/backend/internal/service/jwt"
-	rangeSvc "github.com/AbelHaro/url-shortener/backend/internal/service/range"
 	urlSvc "github.com/AbelHaro/url-shortener/backend/internal/service/url"
 
 	"github.com/gin-gonic/gin"
@@ -43,11 +43,11 @@ func NewApp() *App {
 
 	urlRepoInstance := urlRepo.NewPostgresRepository(db)
 	authRepoInstance := authRepo.NewPostgresRepository(db)
-	rangeRepoInstance := rangeRepo.NewPostgresRepository(db)
+	idrangesRepoInstance := idrangesRepo.NewPostgresRepository(db)
 
-	rangeSvcInstance := rangeSvc.NewService(rangeRepoInstance)
+	idrangesSvcInstance := idrangesSvc.NewService(idrangesRepoInstance)
 
-	counterService, err := counterSvc.NewService(rangeSvcInstance)
+	counterService, err := counterSvc.NewService(idrangesSvcInstance)
 	if err != nil {
 		log.Fatalf("Failed to initialize counter service: %v", err)
 	}
