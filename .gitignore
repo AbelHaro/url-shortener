@@ -12,4 +12,5 @@
 TODO.md
 .env
 /backend/tmp
-/rangealloc/tmp
+/backend/api
+/tmp

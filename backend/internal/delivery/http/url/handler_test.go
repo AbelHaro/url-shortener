@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
-	counterRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/counter"
+	idsRangesRepository "github.com/AbelHaro/url-shortener/backend/internal/repository/idsranges"
 	"github.com/AbelHaro/url-shortener/backend/internal/repository/url"
 	counterSvc "github.com/AbelHaro/url-shortener/backend/internal/service/counter"
+	idsRangesService "github.com/AbelHaro/url-shortener/backend/internal/service/idsranges"
 	urlSvc "github.com/AbelHaro/url-shortener/backend/internal/service/url"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -19,13 +20,15 @@ import (
 const apiRoute = "/api/v1"
 
 func provideHandler() (*Handler, error) {
-	repo := url.NewMockRepository()
-	counterRepoInstance := counterRepo.NewMockRepository()
-	counterSvcInstance, err := counterSvc.NewService(counterRepoInstance)
+	idsRangesRepository := idsRangesRepository.NewMockRepository()
+	idsRangesService := idsRangesService.NewService(idsRangesRepository)
+	counterSvcInstance, err := counterSvc.NewService(idsRangesService)
 	if err != nil {
 		return nil, err
 	}
-	svc := urlSvc.NewService(repo, counterSvcInstance)
+
+	urlRepository := url.NewMockRepository()
+	svc := urlSvc.NewService(urlRepository, counterSvcInstance)
 	return NewHandler(svc), nil
 }
 

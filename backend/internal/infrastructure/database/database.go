@@ -24,7 +24,7 @@ func NewDB(cfg *config.AppConfig) (*gorm.DB, error) {
 		&domain.RefreshToken{},
 		&domain.URL{},
 		&domain.URLStatistics{},
-		&domain.Range{},
+		&domain.IDsRange{},
 	}
 
 	if err := db.AutoMigrate(entities...); err != nil {

@@ -4,12 +4,15 @@ import (
 	"encoding/binary"
 	"testing"
 
+	idsrangesRepository "github.com/AbelHaro/url-shortener/backend/internal/repository/idsranges"
+	idsrangesService "github.com/AbelHaro/url-shortener/backend/internal/service/idsranges"
 	"github.com/cyrildever/feistel"
 )
 
 func provideService() (*Service, error) {
-	repo := counter.NewMockRepository()
-	return NewService(repo)
+	idsRangesRepository := idsrangesRepository.NewMockRepository()
+	idsRangesService := idsrangesService.NewService(idsRangesRepository)
+	return NewService(idsRangesService)
 }
 
 func TestService_GenerateShortHash(t *testing.T) {

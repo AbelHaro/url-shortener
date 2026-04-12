@@ -6,22 +6,22 @@ import (
 	"sync/atomic"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
-	rangeservice "github.com/AbelHaro/url-shortener/backend/internal/service/range"
+	idsRangesService "github.com/AbelHaro/url-shortener/backend/internal/service/idsranges"
 	"github.com/cyrildever/feistel"
 )
 
 const base62Chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 type Service struct {
-	mu           sync.RWMutex
-	counter      int64
-	rangeSvc     *rangeservice.Service
-	currentRange *domain.Range
-	cipher       *feistel.Cipher
-	maxValue     uint64
+	mu       sync.RWMutex
+	counter  int64
+	rangeSvc *idsRangesService.Service
+	IDsRange *domain.IDsRange
+	cipher   *feistel.Cipher
+	maxValue uint64
 }
 
-func NewService(rangeSvc *rangeservice.Service) (*Service, error) {
+func NewService(rangeSvc *idsRangesService.Service) (*Service, error) {
 	svc := &Service{
 		rangeSvc: rangeSvc,
 		cipher:   feistel.NewCipher("url-shortener-secret-key-2026", 12),
@@ -34,7 +34,7 @@ func NewService(rangeSvc *rangeservice.Service) (*Service, error) {
 	}
 	if rangeAllocated != nil {
 		atomic.StoreInt64(&svc.counter, int64(rangeAllocated.Start+rangeAllocated.CurrentOffset))
-		svc.currentRange = rangeAllocated
+		svc.IDsRange = rangeAllocated
 	}
 
 	return svc, nil
@@ -45,14 +45,14 @@ func (svc *Service) NextBase62() (string, error) {
 	svc.mu.Lock()
 	defer svc.mu.Unlock()
 	newVal := atomic.AddInt64(&svc.counter, 1)
-	if newVal >= int64(svc.currentRange.Last) {
+	if newVal >= int64(svc.IDsRange.Last) {
 		rangeAllocated, err := svc.rangeSvc.AllocateRange()
 		if err != nil {
 			return "", err
 		}
 		if rangeAllocated != nil {
 			atomic.StoreInt64(&svc.counter, int64(rangeAllocated.Start+rangeAllocated.CurrentOffset))
-			svc.currentRange = rangeAllocated
+			svc.IDsRange = rangeAllocated
 			newVal = atomic.AddInt64(&svc.counter, 1)
 		} else {
 			return "", err
