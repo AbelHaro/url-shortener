@@ -6,6 +6,8 @@ import (
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
 )
 
+var _ Repository = (*MockRepository)(nil)
+
 type MockRepository struct {
 	stats map[string][]*domain.URLStatistics
 }
