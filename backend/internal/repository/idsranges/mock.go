@@ -5,6 +5,8 @@ import (
 	"github.com/google/uuid"
 )
 
+var _ Repository = (*MockRepository)(nil)
+
 type MockRepository struct {
 	idsRanges []*domain.IDsRange
 }

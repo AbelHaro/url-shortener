@@ -9,6 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var _ Repository = (*PostgresRepository)(nil)
+
 type PostgresRepository struct {
 	db *gorm.DB
 }

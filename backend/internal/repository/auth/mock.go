@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
+var _ Repository = (*MockRepository)(nil)
+
 type MockRepository struct {
 	users         map[string]*domain.User
 	refreshTokens map[string]*domain.RefreshToken

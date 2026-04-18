@@ -135,7 +135,7 @@ func (svc *Service) DeleteByShortCode(shortCode string) error {
 func (svc *Service) ValidateURL(rawURL string) error {
 	_, err := url.ParseRequestURI(rawURL)
 	if err != nil {
-		return errors.New("invalid url format")
+		return domain.ErrInvalidURL
 	}
 	return nil
 }
