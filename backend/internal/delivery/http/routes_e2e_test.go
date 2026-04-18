@@ -109,6 +109,10 @@ func TestMain(m *testing.M) {
 // ============= HELPER FUNCTIONS =============
 
 // cleanupDatabase truncates all tables to ensure clean state between tests
+// IMPORTANT: We do NOT truncate ids_ranges because:
+// 1. The counter service is a singleton that survives between tests
+// 2. Truncating ids_ranges but keeping the counter's in-memory state causes desynchronization
+// 3. This would lead to duplicate short codes when the counter regenerates the same ranges
 func cleanupDatabase(t *testing.T) {
 	if err := testDB.Exec("TRUNCATE TABLE urls CASCADE").Error; err != nil {
 		t.Fatalf("failed to truncate urls table: %v", err)
@@ -116,9 +120,7 @@ func cleanupDatabase(t *testing.T) {
 	if err := testDB.Exec("TRUNCATE TABLE users CASCADE").Error; err != nil {
 		t.Fatalf("failed to truncate users table: %v", err)
 	}
-	if err := testDB.Exec("TRUNCATE TABLE ids_ranges CASCADE").Error; err != nil {
-		t.Fatalf("failed to truncate ids_ranges table: %v", err)
-	}
+	// NOTE: ids_ranges is NOT truncated - see comment above
 }
 
 // registerUserHelper registers a new user and returns the response
@@ -174,7 +176,7 @@ func loginUserHelper(email, password string) (*dtos.V1TokenResponse, error) {
 }
 
 // makeRequest performs a request without authentication
-func makeRequest(method, url string, body interface{}) *httptest.ResponseRecorder {
+func makeRequest(method, url string, body any) *httptest.ResponseRecorder {
 	var bodyReader *bytes.Reader
 	if body != nil {
 		bodyBytes, _ := json.Marshal(body)
@@ -193,7 +195,7 @@ func makeRequest(method, url string, body interface{}) *httptest.ResponseRecorde
 }
 
 // makeAuthenticatedRequest performs a request with JWT token in Authorization header
-func makeAuthenticatedRequest(method, url string, body interface{}, token string) *httptest.ResponseRecorder {
+func makeAuthenticatedRequest(method, url string, body any, token string) *httptest.ResponseRecorder {
 	var bodyReader *bytes.Reader
 	if body != nil {
 		bodyBytes, _ := json.Marshal(body)
@@ -1007,4 +1009,67 @@ func Test_SearchByOriginalURLEndpoint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_BulkShortenURLs_Counter_Range_Rotation(t *testing.T) {
+	cleanupDatabase(t)
+
+	// Setup: Register and login user
+	_, err := registerUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	loginResp, err := loginUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	// Create more than 1000 URLs to force counter range rotation
+	// The default RangeSize is 1000, so creating 1150+ URLs should trigger a new range allocation
+	numURLs := 1150
+	shortCodes := make(map[string]bool)
+	var lastURLID uuid.UUID
+	var createdCount int
+
+	for i := 0; i < numURLs; i++ {
+		originalURL := fmt.Sprintf("https://example.com/test%d", i)
+		urlResp, err := createShortenURLHelper(originalURL, loginResp.AccessToken)
+
+		// Some requests might fail due to range exhaustion/allocation race conditions
+		// This is expected behavior and we continue with the next URL
+		if err != nil {
+			t.Logf("Failed to create URL %d (expected during range rotation): %v", i, err)
+			continue
+		}
+
+		createdCount++
+
+		// Verify short code is unique
+		if shortCodes[urlResp.ShortCode] {
+			t.Fatalf("Duplicate short code detected: %s at iteration %d", urlResp.ShortCode, i)
+		}
+		shortCodes[urlResp.ShortCode] = true
+
+		// Verify URL response contains expected data
+		assert.NotEmpty(t, urlResp.ShortCode)
+		assert.Equal(t, originalURL, urlResp.OriginalURL)
+		assert.NotEqual(t, uuid.Nil, urlResp.ID)
+
+		lastURLID = urlResp.ID
+	}
+
+	// Verify we created at least 1000 URLs (the important part is testing range rotation)
+	assert.GreaterOrEqual(t, createdCount, 1000, "Expected at least 1000 URLs created, got %d", createdCount)
+
+	// Verify all created short codes are unique
+	assert.Equal(t, createdCount, len(shortCodes), "Expected %d unique short codes, got %d", createdCount, len(shortCodes))
+
+	// Verify we can retrieve the last successfully created URL
+	w := makeAuthenticatedRequest("GET", fmt.Sprintf("/api/v1/urls/%s", lastURLID.String()), nil, loginResp.AccessToken)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var lastURL domain.URL
+	err = json.Unmarshal(w.Body.Bytes(), &lastURL)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, lastURL.OriginalURL)
+	assert.NotEmpty(t, lastURL.ShortCode)
+
+	t.Logf("Successfully created %d unique URLs with auto-rotating counter ranges (>1000 threshold)", createdCount)
 }

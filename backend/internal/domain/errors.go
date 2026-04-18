@@ -19,6 +19,6 @@ var (
 	// Range allocation errors
 	ErrRangeAllocFailed = errors.New("failed to allocate range")
 	ErrRangeNotFound    = errors.New("range not found")
-	ErrInvalidRange     = errors.New("invalid range")
+	ErrRangeInvalid     = errors.New("invalid range")
 	ErrRangeConsumed    = errors.New("range consumed")
 )

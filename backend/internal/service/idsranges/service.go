@@ -1,8 +1,6 @@
 package idsranges
 
 import (
-	"fmt"
-
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
 	"github.com/AbelHaro/url-shortener/backend/internal/repository/idsranges"
 	"github.com/google/uuid"
@@ -12,35 +10,47 @@ type Service struct {
 	repo idsranges.Repository
 }
 
+// NewService creates a new IDs range service.
 func NewService(repo idsranges.Repository) *Service {
 	return &Service{repo: repo}
 }
 
-/*
-AllocateRange allocates a new range of IDs for the service. It first checks if there is an active range that can be used, and if so, it updates the offset of that range to avoid duplicating IDs. If there is no active range, it allocates a new range. This method is designed to be idempotent, so if the client is recovering from a failure, it can call this method again without risking ID duplication.
-*/
+// AllocateRange resolves the range to use at startup.
+// If no active range exists, it allocates the first one.
+// If an active range exists and still has capacity, it advances the offset to resume safely.
+// If the active range is exhausted, it allocates the next range.
 func (s *Service) AllocateRange() (*domain.IDsRange, error) {
-	rangeFound, err := s.repo.GetActiveRange()
-
-	fmt.Printf("Error when getting active range: %v\n", err)
-
+	activeRange, err := s.repo.GetActiveRange()
 	if err != nil {
 		return nil, err
 	}
-	if rangeFound != nil {
-		fmt.Printf("Range was found: %+v, so need to update offset\n", rangeFound)
 
-		//Update the current offset because if the client is recovering from a failure, it can be that some IDs in the range are already used, so we need to update the current offset to avoid duplicating IDs. For example, if the range is from 0 to 1000 and the offset is 200, it means that between 200 and 299 could be already used, so we need to update the offset to 300 to avoid duplicating IDs.
-		err = s.repo.UpdateRangeOffset(rangeFound.ID)
-		if err != nil {
-			return nil, err
-		}
-		return rangeFound, nil
+	if activeRange == nil {
+		return s.repo.AllocateNewRange()
 	}
 
-	return s.repo.AllocateRange()
+	if activeRange.Start+activeRange.CurrentOffset >= activeRange.Last {
+		return s.repo.AllocateNewRange()
+	}
+
+	if err := s.repo.UpdateRangeOffset(activeRange.ID); err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetActiveRange()
 }
 
+// AllocateNewRange allocates the next range from the repository.
+func (s *Service) AllocateNewRange() (*domain.IDsRange, error) {
+	return s.repo.AllocateNewRange()
+}
+
+// UpdateRangeOffset advances the persisted offset for the given range.
 func (s *Service) UpdateRangeOffset(rangeID uuid.UUID) error {
 	return s.repo.UpdateRangeOffset(rangeID)
+}
+
+// GetActiveRange returns the current active range, if one exists.
+func (s *Service) GetActiveRange() (*domain.IDsRange, error) {
+	return s.repo.GetActiveRange()
 }
