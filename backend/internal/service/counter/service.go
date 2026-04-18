@@ -11,6 +11,7 @@ import (
 )
 
 const base62Chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const rangeOffset = 100
 
 type Service struct {
 	mu       sync.RWMutex
@@ -21,6 +22,7 @@ type Service struct {
 	maxValue uint64
 }
 
+// NewService creates a counter service and initializes it with the current range.
 func NewService(rangeSvc *idsRangesService.Service) (*Service, error) {
 	svc := &Service{
 		rangeSvc: rangeSvc,
@@ -33,7 +35,7 @@ func NewService(rangeSvc *idsRangesService.Service) (*Service, error) {
 		return nil, err
 	}
 	if rangeAllocated != nil {
-		atomic.StoreInt64(&svc.counter, int64(rangeAllocated.Start+rangeAllocated.CurrentOffset))
+		atomic.StoreInt64(&svc.counter, int64(rangeAllocated.Start+rangeAllocated.CurrentOffset-1))
 		svc.IDsRange = rangeAllocated
 	}
 
@@ -44,25 +46,36 @@ func NewService(rangeSvc *idsRangesService.Service) (*Service, error) {
 func (svc *Service) NextBase62() (string, error) {
 
 	svc.mu.Lock()
+	defer svc.mu.Unlock()
+
 	newVal := atomic.AddInt64(&svc.counter, 1)
-	// Check if the new value exceeds the allocated range. If it does, allocate a new range and update the counter accordingly. Do this in a thread-safe way to avoid race conditions and ensure that only one goroutine can allocate a new range at a time.
-	if newVal >= int64(svc.IDsRange.Last) {
-		rangeAllocated, err := svc.rangeSvc.AllocateRange()
+
+	// Check if the new value exceeds the allocated range. If it does, allocate a new range and update the counter accordingly.
+	// Do this in a thread-safe way to avoid race conditions and ensure that only one goroutine can allocate a new range at a time.
+	if svc.IDsRange == nil || newVal >= int64(svc.IDsRange.Last) {
+		rangeAllocated, err := svc.rangeSvc.AllocateNewRange()
 		if err != nil {
-			svc.mu.Unlock()
 			return "", err
 		}
 		if rangeAllocated != nil {
-			atomic.StoreInt64(&svc.counter, int64(rangeAllocated.Start+rangeAllocated.CurrentOffset))
+			// Reset the counter to the start of the new range, accounting for any offset
+			newCounterStart := int64(rangeAllocated.Start + rangeAllocated.CurrentOffset - 1)
+			atomic.StoreInt64(&svc.counter, newCounterStart)
 			svc.IDsRange = rangeAllocated
+			// Increment counter and get the new value
 			newVal = atomic.AddInt64(&svc.counter, 1)
 		} else {
-			svc.mu.Unlock()
 			return "", err
 		}
 	}
 
-	svc.mu.Unlock()
+	consumed := newVal - int64(svc.IDsRange.Start) + 1
+	if consumed%rangeOffset == 0 {
+		if err := svc.rangeSvc.UpdateRangeOffset(svc.IDsRange.ID); err != nil {
+			return "", err
+		}
+		svc.IDsRange.CurrentOffset += rangeOffset
+	}
 
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, uint64(newVal))
@@ -78,6 +91,7 @@ func (svc *Service) NextBase62() (string, error) {
 	return svc.ToBase62(int64(result)), nil
 }
 
+// ToBase62 converts a positive integer to its base62 representation.
 func (svc *Service) ToBase62(n int64) string {
 	if n == 0 {
 		return string(base62Chars[0])
@@ -94,6 +108,7 @@ func (svc *Service) ToBase62(n int64) string {
 	return string(result)
 }
 
+// PadBase62 left-pads a base62 string with zeros until it reaches the requested length.
 func (svc *Service) PadBase62(s string, length int) string {
 	if len(s) >= length {
 		return s
@@ -114,6 +129,7 @@ func (svc *Service) indexOf(char rune, s string) int {
 	return -1
 }
 
+// GenerateShortHash returns the padded public short hash used for URLs.
 func (svc *Service) GenerateShortHash() (string, error) {
 	num, err := svc.NextBase62()
 	if err != nil {

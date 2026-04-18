@@ -19,7 +19,7 @@ func NewMockRepository() Repository {
 	}
 }
 
-func (m *MockRepository) AllocateRange() (*domain.IDsRange, error) {
+func (m *MockRepository) AllocateNewRange() (*domain.IDsRange, error) {
 	lastRange := m.idsRanges[len(m.idsRanges)-1]
 	if lastRange.Start+lastRange.CurrentOffset+RANGE_OFFSET >= lastRange.Last {
 		newRange := &domain.IDsRange{

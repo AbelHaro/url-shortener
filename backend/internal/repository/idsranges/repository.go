@@ -6,8 +6,7 @@ import (
 )
 
 type Repository interface {
-	AllocateRange() (*domain.IDsRange, error)
+	AllocateNewRange() (*domain.IDsRange, error)
 	UpdateRangeOffset(rangeID uuid.UUID) error
-	GetNextRangeAvailable() (start uint64, err error)
 	GetActiveRange() (*domain.IDsRange, error)
 }
