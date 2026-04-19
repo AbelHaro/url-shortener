@@ -9,7 +9,7 @@ export function Landing() {
         <CardHeader>
           <CardTitle>URL Shortener</CardTitle>
           <CardDescription>
-            A simple and fast URL shortening service
+            A overengineered and fast URL shortening service for learning purposes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

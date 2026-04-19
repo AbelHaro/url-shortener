@@ -1,13 +1,21 @@
 # URL Shortener
 
-A simple and fast URL shortening service built with Go (backend) and React + TypeScript (frontend).
-
+A overengineered and fast URL shortening service built with Go (backend) and React + TypeScript (frontend) for learning purposes.
 ## Features
 
 - Instant URL shortening
 - Easy to remember short codes
 - Fast redirects
 - RESTful API with Swagger documentation
+
+## Roadmap
+- [x] Basic URL shortening and redirection
+- [x] RESTful API with Gin
+- [x] Frontend with React and TypeScript
+- [x] Dockerization
+- [X] User authentication
+- [ ] Analytics dashboard for user links
+- [ ] Observability with OpenTelemetry
 
 ## Tech Stack
 
