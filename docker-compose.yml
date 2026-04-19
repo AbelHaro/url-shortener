@@ -22,6 +22,10 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8080
+      - JWT_SECRET=${JWT_SECRET}
+      - PRODUCTION=true
       - GIN_MODE=release
       - TRUSTED_PROXIES=0.0.0.0/0
     expose:
