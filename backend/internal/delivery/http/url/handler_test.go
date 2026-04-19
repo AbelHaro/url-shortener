@@ -52,7 +52,7 @@ func provideJWTMiddleware() *middleware.JWTMiddleware {
 	authRepository := authRepo.NewMockRepository()
 	jwtService := jwtSvc.NewService(testJWTSecret, 15*time.Minute, 24*time.Hour)
 	authService := authSvc.NewService(authRepository, jwtService)
-	return middleware.NewJWTMiddleware(authService)
+	return middleware.NewJWTMiddleware(authService, false)
 }
 
 func TestHandler_Create(t *testing.T) {
@@ -70,17 +70,17 @@ func TestHandler_Create(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		body       dtos.V1CreateShortenRequest
+		body       dtos.CreateShortenRequest
 		wantStatus int
 	}{
 		{
 			name:       "valid url",
-			body:       dtos.V1CreateShortenRequest{OriginalUrl: "https://google.com"},
+			body:       dtos.CreateShortenRequest{OriginalUrl: "https://google.com"},
 			wantStatus: http.StatusCreated,
 		},
 		{
 			name:       "invalid request",
-			body:       dtos.V1CreateShortenRequest{OriginalUrl: "invalid-url"},
+			body:       dtos.CreateShortenRequest{OriginalUrl: "invalid-url"},
 			wantStatus: http.StatusBadRequest,
 		},
 	}
@@ -285,22 +285,22 @@ func TestHandler_FindByOriginalURL(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		body       map[string]string
+		body       dtos.SearchByOriginalURLRequest
 		wantStatus int
 	}{
 		{
 			name:       "existing url",
-			body:       map[string]string{"url": "https://google.com"},
+			body:       dtos.SearchByOriginalURLRequest{OriginalURL: "https://google.com"},
 			wantStatus: http.StatusOK,
 		},
 		{
 			name:       "not found url",
-			body:       map[string]string{"url": "https://notfound.com"},
+			body:       dtos.SearchByOriginalURLRequest{OriginalURL: "https://notfound.com"},
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "invalid request",
-			body:       map[string]string{},
+			body:       dtos.SearchByOriginalURLRequest{},
 			wantStatus: http.StatusBadRequest,
 		},
 	}

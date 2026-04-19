@@ -34,6 +34,11 @@ func (m *MockRepository) CreateUser(user *domain.User) error {
 	return nil
 }
 
+func (m *MockRepository) UpdateUser(user *domain.User) error {
+	m.users[user.ID.String()] = user
+	return nil
+}
+
 func (m *MockRepository) FindByEmail(email string) (*domain.User, error) {
 	for _, user := range m.users {
 		if user.Email == email {

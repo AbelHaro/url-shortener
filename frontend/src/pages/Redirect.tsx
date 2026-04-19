@@ -1,15 +1,20 @@
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { useGetUrlByShortCode } from "@/api/hooks/useUrl";
+import { useGetURLByShortCode } from "@/api/generated";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function Redirect() {
   const { shortCode } = useParams<{ shortCode: string }>();
-  const { data, isLoading, isError } = useGetUrlByShortCode(shortCode || null);
+  const { data, isLoading, isError } = useGetURLByShortCode(shortCode!, {
+    query: {
+    enabled: !!shortCode,
+  }
+});
+
 
   useEffect(() => {
-    if (data?.originalUrl) {
-      window.location.href = data.originalUrl;
+    if (data?.status === 200 && data.data.original_url) {
+      window.location.href = data.data.original_url;
     }
   }, [data]);
 

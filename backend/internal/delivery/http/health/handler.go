@@ -29,6 +29,7 @@ type Response struct {
 // @Produce json
 // @Success 200 {object} Response
 // @Router /health [get]
+// @ID getHealth
 func (h *Handler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, Response{Status: "ok"})
 }

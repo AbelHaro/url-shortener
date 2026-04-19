@@ -1,6 +1,6 @@
 basePath: /api/v1
 definitions:
-  github_com_AbelHaro_url-shortener_backend_internal_domain.URL:
+  domain.URL:
     properties:
       created_at:
         type: string
@@ -15,19 +15,26 @@ definitions:
       user_id:
         type: string
     type: object
-  github_com_AbelHaro_url-shortener_backend_internal_dtos.V1CreateShortenRequest:
+  dtos.AuthResponse:
+    properties:
+      tokens:
+        $ref: '#/definitions/dtos.TokenResponse'
+      user:
+        $ref: '#/definitions/dtos.UserResponse'
+    type: object
+  dtos.CreateShortenRequest:
     properties:
       original_url:
         type: string
     required:
     - original_url
     type: object
-  github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse:
+  dtos.ErrorResponse:
     properties:
       error:
         type: string
     type: object
-  github_com_AbelHaro_url-shortener_backend_internal_dtos.V1LoginRequest:
+  dtos.LoginRequest:
     properties:
       email:
         type: string
@@ -38,14 +45,14 @@ definitions:
     - email
     - password
     type: object
-  github_com_AbelHaro_url-shortener_backend_internal_dtos.V1RefreshTokenRequest:
+  dtos.RefreshTokenRequest:
     properties:
       refresh_token:
         type: string
     required:
     - refresh_token
     type: object
-  github_com_AbelHaro_url-shortener_backend_internal_dtos.V1RegisterRequest:
+  dtos.RegisterRequest:
     properties:
       email:
         type: string
@@ -56,21 +63,26 @@ definitions:
     - email
     - password
     type: object
-  github_com_AbelHaro_url-shortener_backend_internal_dtos.V1SearchByOriginalURLRequest:
+  dtos.SearchByOriginalURLRequest:
     properties:
-      url:
+      original_url:
         type: string
     required:
-    - url
+    - original_url
     type: object
-  github_com_AbelHaro_url-shortener_backend_internal_dtos.V1TokenResponse:
+  dtos.SessionResponse:
+    properties:
+      user:
+        $ref: '#/definitions/dtos.UserResponse'
+    type: object
+  dtos.TokenResponse:
     properties:
       access_token:
         type: string
       refresh_token:
         type: string
     type: object
-  github_com_AbelHaro_url-shortener_backend_internal_dtos.V1URLResponse:
+  dtos.URLResponse:
     properties:
       created_at:
         type: string
@@ -84,15 +96,24 @@ definitions:
         type: string
       user_id:
         type: string
+    required:
+    - created_at
+    - id
+    - original_url
+    - short_code
+    - updated_at
+    - user_id
     type: object
-  github_com_AbelHaro_url-shortener_backend_internal_dtos.V1UserResponse:
+  dtos.UserResponse:
     properties:
       email:
         type: string
       id:
         type: string
+      name:
+        type: string
     type: object
-  internal_delivery_http_health.Response:
+  health.Response:
     properties:
       status:
         type: string
@@ -107,6 +128,7 @@ paths:
   /{shortURL}:
     get:
       description: Redirects a shortened URL to its original URL
+      operationId: getRedirect
       parameters:
       - description: Short URL
         in: path
@@ -119,47 +141,69 @@ paths:
       summary: Redirect to original URL
       tags:
       - URLs
+  /auth/anonymous:
+    post:
+      consumes:
+      - application/json
+      description: Create a new anonymous account with a random name
+      operationId: postAuthAnonymousRegister
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dtos.AuthResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+      summary: Register anonymous user
+      tags:
+      - Auth
   /auth/login:
     post:
       consumes:
       - application/json
       description: Authenticate with email and password, returns access and refresh
         tokens
+      operationId: postAuthLogin
       parameters:
       - description: Login credentials
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1LoginRequest'
+          $ref: '#/definitions/dtos.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1TokenResponse'
+            $ref: '#/definitions/dtos.AuthResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Login user
       tags:
       - Auth
   /auth/logout:
     post:
       description: Invalidate all refresh tokens for the authenticated user
+      operationId: postAuthLogout
       responses:
         "204":
           description: No Content
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Logout user
@@ -170,28 +214,29 @@ paths:
       consumes:
       - application/json
       description: Use refresh token to get a new access token and refresh token
+      operationId: postAuthRefresh
       parameters:
       - description: Refresh token
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1RefreshTokenRequest'
+          $ref: '#/definitions/dtos.RefreshTokenRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1TokenResponse'
+            $ref: '#/definitions/dtos.TokenResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Refresh access token
       tags:
       - Auth
@@ -200,37 +245,61 @@ paths:
       consumes:
       - application/json
       description: Create a new user account with email and password
+      operationId: postAuthRegister
       parameters:
       - description: Registration details
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1RegisterRequest'
+          $ref: '#/definitions/dtos.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1UserResponse'
+            $ref: '#/definitions/dtos.AuthResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Register a new user
+      tags:
+      - Auth
+  /auth/session:
+    get:
+      description: Returns the current authenticated user
+      operationId: getAuthSession
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.SessionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Current session
       tags:
       - Auth
   /health:
     get:
       description: Returns the health status of the API
+      operationId: getHealth
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_delivery_http_health.Response'
+            $ref: '#/definitions/health.Response'
       summary: Health check
       tags:
       - Health
@@ -239,30 +308,32 @@ paths:
       consumes:
       - application/json
       description: Create a shortened URL from a long URL
+      operationId: postShortenURL
       parameters:
       - description: Request body
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1CreateShortenRequest'
+          $ref: '#/definitions/dtos.CreateShortenRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1URLResponse'
+            $ref: '#/definitions/dtos.URLResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Shorten a URL
       tags:
       - URLs
   /urls/{id}:
     delete:
       description: Delete a URL by its ID
+      operationId: deleteURLByID
       parameters:
       - description: URL ID
         in: path
@@ -275,12 +346,13 @@ paths:
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Delete URL
       tags:
       - URLs
     get:
       description: Retrieve a URL by its ID
+      operationId: getURLByID
       parameters:
       - description: URL ID
         in: path
@@ -293,11 +365,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_domain.URL'
+            $ref: '#/definitions/domain.URL'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Get URL by ID
       tags:
       - URLs
@@ -306,30 +378,32 @@ paths:
       consumes:
       - application/json
       description: Find a shortened URL by its original URL
+      operationId: postURLsSearch
       parameters:
       - description: Request body
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1SearchByOriginalURLRequest'
+          $ref: '#/definitions/dtos.SearchByOriginalURLRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_domain.URL'
+            $ref: '#/definitions/domain.URL'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Search URL by original URL
       tags:
       - URLs
   /urls/short/{shortCode}:
     get:
       description: Retrieve a URL by its short code
+      operationId: getURLByShortCode
       parameters:
       - description: Short Code
         in: path
@@ -342,11 +416,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_domain.URL'
+            $ref: '#/definitions/domain.URL'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse'
+            $ref: '#/definitions/dtos.ErrorResponse'
       summary: Get URL by short code
       tags:
       - URLs

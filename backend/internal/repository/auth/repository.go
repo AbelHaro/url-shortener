@@ -6,6 +6,7 @@ import (
 
 type Repository interface {
 	CreateUser(user *domain.User) error
+	UpdateUser(user *domain.User) error
 	FindByEmail(email string) (*domain.User, error)
 	FindByID(id string) (*domain.User, error)
 	StoreRefreshToken(userID, token string) error

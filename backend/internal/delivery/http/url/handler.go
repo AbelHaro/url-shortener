@@ -33,30 +33,31 @@ func NewHandler(svc *url.Service) *Handler {
 // @Tags URLs
 // @Accept json
 // @Produce json
-// @Param request body dtos.V1CreateShortenRequest true "Request body"
-// @Success 201 {object} dtos.V1URLResponse
-// @Failure 400 {object} dtos.V1ErrorResponse
+// @Param request body dtos.CreateShortenRequest true "Request body"
+// @Success 201 {object} dtos.URLResponse
+// @Failure 400 {object} dtos.ErrorResponse
 // @Router /shorten [post]
+// @ID postShortenURL
 func (h *Handler) Create(c *gin.Context) {
 
 	ownerIDRaw, exists := c.Get("userID")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, dtos.V1ErrorResponse{Error: "user not authenticated"})
+		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "user not authenticated"})
 		return
 	}
 
 	ownerID := uuid.MustParse(fmt.Sprintf("%v", ownerIDRaw))
 
 	if ownerID == uuid.Nil {
-		c.JSON(http.StatusUnauthorized, dtos.V1ErrorResponse{Error: "invalid user ID"})
+		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "invalid user ID"})
 		return
 	}
 
-	var req dtos.V1CreateShortenRequest
+	var req dtos.CreateShortenRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Println(err)
-		c.JSON(http.StatusBadRequest, dtos.V1ErrorResponse{Error: "invalid request body"})
+		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: "invalid request body"})
 		return
 	}
 
@@ -66,7 +67,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	urlCreatedResponse := dtos.V1URLResponse{
+	urlCreatedResponse := dtos.URLResponse{
 		ID:          urlCreated.ID,
 		OriginalURL: urlCreated.OriginalURL,
 		ShortCode:   urlCreated.ShortCode,
@@ -85,6 +86,7 @@ func (h *Handler) Create(c *gin.Context) {
 // @Param shortURL path string true "Short URL"
 // @Success 301
 // @Router /{shortURL} [get]
+// @ID getRedirect
 func (h *Handler) Redirect(c *gin.Context) {
 	shortURL := c.Param("shortURL")
 
@@ -104,8 +106,9 @@ func (h *Handler) Redirect(c *gin.Context) {
 // @Produce json
 // @Param id path string true "URL ID"
 // @Success 200 {object} domain.URL
-// @Failure 404 {object} dtos.V1ErrorResponse
+// @Failure 404 {object} dtos.ErrorResponse
 // @Router /urls/{id} [get]
+// @ID getURLByID
 func (h *Handler) FindByID(c *gin.Context) {
 	id := c.Param("id")
 
@@ -125,8 +128,9 @@ func (h *Handler) FindByID(c *gin.Context) {
 // @Produce json
 // @Param shortCode path string true "Short Code"
 // @Success 200 {object} domain.URL
-// @Failure 404 {object} dtos.V1ErrorResponse
+// @Failure 404 {object} dtos.ErrorResponse
 // @Router /urls/short/{shortCode} [get]
+// @ID getURLByShortCode
 func (h *Handler) FindByShortCode(c *gin.Context) {
 	shortCode := c.Param("shortCode")
 
@@ -145,8 +149,9 @@ func (h *Handler) FindByShortCode(c *gin.Context) {
 // @Tags URLs
 // @Param id path string true "URL ID"
 // @Success 204
-// @Failure 404 {object} dtos.V1ErrorResponse
+// @Failure 404 {object} dtos.ErrorResponse
 // @Router /urls/{id} [delete]
+// @ID deleteURLByID
 func (h *Handler) DeleteByID(c *gin.Context) {
 	id := c.Param("id")
 
@@ -165,26 +170,27 @@ func (h *Handler) DeleteByID(c *gin.Context) {
 // @Tags URLs
 // @Accept json
 // @Produce json
-// @Param request body dtos.V1SearchByOriginalURLRequest true "Request body"
+// @Param request body dtos.SearchByOriginalURLRequest true "Request body"
 // @Success 200 {object} domain.URL
-// @Failure 404 {object} dtos.V1ErrorResponse
+// @Failure 404 {object} dtos.ErrorResponse
 // @Router /urls/search [post]
+// @ID postURLsSearch
 func (h *Handler) FindByOriginalURL(c *gin.Context) {
-	var req dtos.V1SearchByOriginalURLRequest
+	var req dtos.SearchByOriginalURLRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dtos.V1ErrorResponse{Error: "invalid request body"})
+		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: "invalid request body"})
 		return
 	}
 
-	urlFound, err := h.Service.FindByOriginalURL(req.URL)
+	urlFound, err := h.Service.FindByOriginalURL(req.OriginalURL)
 	if err != nil {
 		h.handleError(c, err)
 		return
 	}
 
 	if urlFound == nil {
-		c.JSON(http.StatusNotFound, dtos.V1ErrorResponse{Error: "url not found"})
+		c.JSON(http.StatusNotFound, dtos.ErrorResponse{Error: "url not found"})
 		return
 	}
 
@@ -194,10 +200,10 @@ func (h *Handler) FindByOriginalURL(c *gin.Context) {
 func (h *Handler) handleError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrURLNotFound):
-		c.JSON(http.StatusNotFound, dtos.V1ErrorResponse{Error: err.Error()})
+		c.JSON(http.StatusNotFound, dtos.ErrorResponse{Error: err.Error()})
 	case errors.Is(err, domain.ErrInvalidURL):
-		c.JSON(http.StatusBadRequest, dtos.V1ErrorResponse{Error: err.Error()})
+		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: err.Error()})
 	default:
-		c.JSON(http.StatusInternalServerError, dtos.V1ErrorResponse{Error: "internal server error"})
+		c.JSON(http.StatusInternalServerError, dtos.ErrorResponse{Error: "internal server error"})
 	}
 }

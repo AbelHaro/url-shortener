@@ -15,6 +15,36 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/auth/anonymous": {
+            "post": {
+                "description": "Create a new anonymous account with a random name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Register anonymous user",
+                "operationId": "postAuthAnonymousRegister",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.AuthResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "description": "Authenticate with email and password, returns access and refresh tokens",
@@ -28,6 +58,7 @@ const docTemplate = `{
                     "Auth"
                 ],
                 "summary": "Login user",
+                "operationId": "postAuthLogin",
                 "parameters": [
                     {
                         "description": "Login credentials",
@@ -35,7 +66,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1LoginRequest"
+                            "$ref": "#/definitions/dtos.LoginRequest"
                         }
                     }
                 ],
@@ -43,19 +74,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1TokenResponse"
+                            "$ref": "#/definitions/dtos.AuthResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse"
+                            "$ref": "#/definitions/dtos.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse"
+                            "$ref": "#/definitions/dtos.ErrorResponse"
                         }
                     }
                 }
@@ -73,6 +104,7 @@ const docTemplate = `{
                     "Auth"
                 ],
                 "summary": "Logout user",
+                "operationId": "postAuthLogout",
                 "responses": {
                     "204": {
                         "description": "No Content"
@@ -80,7 +112,7 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse"
+                            "$ref": "#/definitions/dtos.ErrorResponse"
                         }
                     }
                 }
@@ -99,6 +131,7 @@ const docTemplate = `{
                     "Auth"
                 ],
                 "summary": "Refresh access token",
+                "operationId": "postAuthRefresh",
                 "parameters": [
                     {
                         "description": "Refresh token",
@@ -106,7 +139,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1RefreshTokenRequest"
+                            "$ref": "#/definitions/dtos.RefreshTokenRequest"
                         }
                     }
                 ],
@@ -114,19 +147,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1TokenResponse"
+                            "$ref": "#/definitions/dtos.TokenResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse"
+                            "$ref": "#/definitions/dtos.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse"
+                            "$ref": "#/definitions/dtos.ErrorResponse"
                         }
                     }
                 }
@@ -145,6 +178,7 @@ const docTemplate = `{
                     "Auth"
                 ],
                 "summary": "Register a new user",
+                "operationId": "postAuthRegister",
                 "parameters": [
                     {
                         "description": "Registration details",
@@ -152,7 +186,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1RegisterRequest"
+                            "$ref": "#/definitions/dtos.RegisterRequest"
                         }
                     }
                 ],
@@ -160,13 +194,48 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1UserResponse"
+                            "$ref": "#/definitions/dtos.AuthResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse"
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/session": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the current authenticated user",
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Current session",
+                "operationId": "getAuthSession",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.SessionResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
                         }
                     }
                 }
@@ -182,11 +251,12 @@ const docTemplate = `{
                     "Health"
                 ],
                 "summary": "Health check",
+                "operationId": "getHealth",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_delivery_http_health.Response"
+                            "$ref": "#/definitions/health.Response"
                         }
                     }
                 }
@@ -205,6 +275,7 @@ const docTemplate = `{
                     "URLs"
                 ],
                 "summary": "Shorten a URL",
+                "operationId": "postShortenURL",
                 "parameters": [
                     {
                         "description": "Request body",
@@ -212,7 +283,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1CreateShortenRequest"
+                            "$ref": "#/definitions/dtos.CreateShortenRequest"
                         }
                     }
                 ],
@@ -220,13 +291,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1URLResponse"
+                            "$ref": "#/definitions/dtos.URLResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse"
+                            "$ref": "#/definitions/dtos.ErrorResponse"
                         }
                     }
                 }
@@ -245,6 +316,7 @@ const docTemplate = `{
                     "URLs"
                 ],
                 "summary": "Search URL by original URL",
+                "operationId": "postURLsSearch",
                 "parameters": [
                     {
                         "description": "Request body",
@@ -252,7 +324,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1SearchByOriginalURLRequest"
+                            "$ref": "#/definitions/dtos.SearchByOriginalURLRequest"
                         }
                     }
                 ],
@@ -260,13 +332,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_domain.URL"
+                            "$ref": "#/definitions/domain.URL"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse"
+                            "$ref": "#/definitions/dtos.ErrorResponse"
                         }
                     }
                 }
@@ -282,6 +354,7 @@ const docTemplate = `{
                     "URLs"
                 ],
                 "summary": "Get URL by short code",
+                "operationId": "getURLByShortCode",
                 "parameters": [
                     {
                         "type": "string",
@@ -295,13 +368,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_domain.URL"
+                            "$ref": "#/definitions/domain.URL"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse"
+                            "$ref": "#/definitions/dtos.ErrorResponse"
                         }
                     }
                 }
@@ -317,6 +390,7 @@ const docTemplate = `{
                     "URLs"
                 ],
                 "summary": "Get URL by ID",
+                "operationId": "getURLByID",
                 "parameters": [
                     {
                         "type": "string",
@@ -330,13 +404,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_domain.URL"
+                            "$ref": "#/definitions/domain.URL"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse"
+                            "$ref": "#/definitions/dtos.ErrorResponse"
                         }
                     }
                 }
@@ -347,6 +421,7 @@ const docTemplate = `{
                     "URLs"
                 ],
                 "summary": "Delete URL",
+                "operationId": "deleteURLByID",
                 "parameters": [
                     {
                         "type": "string",
@@ -363,7 +438,7 @@ const docTemplate = `{
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse"
+                            "$ref": "#/definitions/dtos.ErrorResponse"
                         }
                     }
                 }
@@ -376,6 +451,7 @@ const docTemplate = `{
                     "URLs"
                 ],
                 "summary": "Redirect to original URL",
+                "operationId": "getRedirect",
                 "parameters": [
                     {
                         "type": "string",
@@ -394,7 +470,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "github_com_AbelHaro_url-shortener_backend_internal_domain.URL": {
+        "domain.URL": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -417,7 +493,18 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_AbelHaro_url-shortener_backend_internal_dtos.V1CreateShortenRequest": {
+        "dtos.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "tokens": {
+                    "$ref": "#/definitions/dtos.TokenResponse"
+                },
+                "user": {
+                    "$ref": "#/definitions/dtos.UserResponse"
+                }
+            }
+        },
+        "dtos.CreateShortenRequest": {
             "type": "object",
             "required": [
                 "original_url"
@@ -428,7 +515,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_AbelHaro_url-shortener_backend_internal_dtos.V1ErrorResponse": {
+        "dtos.ErrorResponse": {
             "type": "object",
             "properties": {
                 "error": {
@@ -436,7 +523,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_AbelHaro_url-shortener_backend_internal_dtos.V1LoginRequest": {
+        "dtos.LoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -452,7 +539,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_AbelHaro_url-shortener_backend_internal_dtos.V1RefreshTokenRequest": {
+        "dtos.RefreshTokenRequest": {
             "type": "object",
             "required": [
                 "refresh_token"
@@ -463,7 +550,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_AbelHaro_url-shortener_backend_internal_dtos.V1RegisterRequest": {
+        "dtos.RegisterRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -479,18 +566,26 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_AbelHaro_url-shortener_backend_internal_dtos.V1SearchByOriginalURLRequest": {
+        "dtos.SearchByOriginalURLRequest": {
             "type": "object",
             "required": [
-                "url"
+                "original_url"
             ],
             "properties": {
-                "url": {
+                "original_url": {
                     "type": "string"
                 }
             }
         },
-        "github_com_AbelHaro_url-shortener_backend_internal_dtos.V1TokenResponse": {
+        "dtos.SessionResponse": {
+            "type": "object",
+            "properties": {
+                "user": {
+                    "$ref": "#/definitions/dtos.UserResponse"
+                }
+            }
+        },
+        "dtos.TokenResponse": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -501,8 +596,16 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_AbelHaro_url-shortener_backend_internal_dtos.V1URLResponse": {
+        "dtos.URLResponse": {
             "type": "object",
+            "required": [
+                "created_at",
+                "id",
+                "original_url",
+                "short_code",
+                "updated_at",
+                "user_id"
+            ],
             "properties": {
                 "created_at": {
                     "type": "string"
@@ -524,7 +627,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_AbelHaro_url-shortener_backend_internal_dtos.V1UserResponse": {
+        "dtos.UserResponse": {
             "type": "object",
             "properties": {
                 "email": {
@@ -532,10 +635,13 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
-        "internal_delivery_http_health.Response": {
+        "health.Response": {
             "type": "object",
             "properties": {
                 "status": {
