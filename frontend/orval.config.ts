@@ -52,6 +52,7 @@ const renameDtos = defineTransformer((input) => {
   );
 
   return {
+    // @ts-expect-error - We know the structure of the input and output, but it's too complex for TypeScript to verify
     ...rewriteRefs(input),
     components: {
       ...input.components,
