@@ -9,30 +9,30 @@ on:
     branches: [main]
 
 jobs:
-#  backend-test:
-#    name: Backend Tests
-#    runs-on: ubuntu-latest
-#    outputs:
-#      result: ${{ steps.test.outcome }}
-#    steps:
-#      - name: Checkout repository
-#        uses: actions/checkout@v4
-#
-#      - name: Set up Go
-#        uses: actions/setup-go@v5
-#        with:
-#          go-version-file: backend/go.mod
-#          cache: true
-#
-#      - name: Run go mod tidy
-#        working-directory: backend
-#        run: go mod tidy
-#
-#      - name: Run tests
-#        id: test
-#        working-directory: backend
-#        run: go test -v ./...
-#
+  backend-test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.test.outcome }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache: true
+
+      - name: Run go mod tidy
+        working-directory: backend
+        run: go mod tidy
+
+      - name: Run tests
+        id: test
+        working-directory: backend
+        run: go test -v ./...
+
 #  frontend-test:
 #    name: Frontend Tests
 #    runs-on: ubuntu-latest
@@ -61,6 +61,8 @@ jobs:
   backend-build:
     name: Build Backend
     runs-on: ubuntu-latest
+    needs: [backend-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     env:
       REGISTRY: docker.io
       IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/url-shortener-backend
@@ -107,6 +109,8 @@ jobs:
   frontend-build:
     name: Build Frontend
     runs-on: ubuntu-latest
+    needs: [backend-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     env:
       REGISTRY: docker.io
       IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/url-shortener-frontend
@@ -156,7 +160,7 @@ jobs:
     name: Deploy to Dokploy
     runs-on: ubuntu-latest
     needs: [backend-build, frontend-build]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Trigger Dokploy deployment
         run: |
