@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
@@ -24,8 +26,22 @@ func (repo *PostgresRepository) CreateUser(user *domain.User) error {
 
 	err := gorm.G[domain.User](repo.db).Create(ctx, user)
 	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) || strings.Contains(err.Error(), "23505") {
+			return domain.ErrUserExists
+		}
 		return domain.ErrInternal
 	}
+	return nil
+}
+
+func (repo *PostgresRepository) UpdateUser(user *domain.User) error {
+	ctx := context.Background()
+
+	result := repo.db.WithContext(ctx).Save(user)
+	if result.Error != nil {
+		return domain.ErrInternal
+	}
+
 	return nil
 }
 
@@ -63,6 +79,10 @@ func (repo *PostgresRepository) StoreRefreshToken(userID, token string) error {
 
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
+		return domain.ErrInternal
+	}
+
+	if err := repo.db.WithContext(ctx).Where("user_id = ?", userUUID).Delete(&domain.RefreshToken{}).Error; err != nil {
 		return domain.ErrInternal
 	}
 

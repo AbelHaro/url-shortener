@@ -1,7 +1,8 @@
 package dtos
 
-// V1ErrorResponse is a shared error response format used across all APIs
-type V1ErrorResponse struct {
+// ErrorResponse is a shared error response format used across all APIs
+// @name ErrorResponse
+type ErrorResponse struct {
 	Error string `json:"error"`
 }
 

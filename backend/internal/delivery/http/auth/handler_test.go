@@ -23,7 +23,7 @@ func provideHandler() (*Handler, error) {
 	jwtSvc := jwt.NewService("testsecret", 15*time.Minute, 7*24*time.Hour)
 
 	svc := authSvc.NewService(repo, jwtSvc)
-	return NewHandler(svc), nil
+	return NewHandler(svc, false), nil
 }
 
 func TestHandler_Register(t *testing.T) {
@@ -34,19 +34,22 @@ func TestHandler_Register(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		request    dtos.V1RegisterRequest
+		request    dtos.RegisterRequest
 		response   any
 		wantStatus int
 		wantError  bool
 	}{
 		{
 			name: "valid registration",
-			request: dtos.V1RegisterRequest{
+			request: dtos.RegisterRequest{
 				Email:    "test@example.com",
 				Password: "password123",
 			},
-			response: dtos.V1UserResponse{
-				Email: "test@example.com",
+			response: dtos.AuthResponse{
+				User: dtos.UserResponse{
+					Email: "test@example.com",
+					Name:  "",
+				},
 			},
 			wantStatus: http.StatusCreated,
 			wantError:  false,
@@ -54,28 +57,28 @@ func TestHandler_Register(t *testing.T) {
 
 		{
 			name: "invalid email",
-			request: dtos.V1RegisterRequest{
+			request: dtos.RegisterRequest{
 				Email:    "invalid-email",
 				Password: "password123",
 			},
-			response:   dtos.V1ErrorResponse{Error: "invalid request"},
+			response:   dtos.ErrorResponse{Error: "invalid request"},
 			wantStatus: http.StatusBadRequest,
 			wantError:  true,
 		},
 		{
 			name: "short password",
-			request: dtos.V1RegisterRequest{
+			request: dtos.RegisterRequest{
 				Email:    "test@example.com",
 				Password: "short",
 			},
-			response:   dtos.V1ErrorResponse{Error: "invalid request"},
+			response:   dtos.ErrorResponse{Error: "invalid request"},
 			wantStatus: http.StatusBadRequest,
 			wantError:  true,
 		},
 		{
 			name:       "empty request",
-			request:    dtos.V1RegisterRequest{},
-			response:   dtos.V1ErrorResponse{Error: "invalid request"},
+			request:    dtos.RegisterRequest{},
+			response:   dtos.ErrorResponse{Error: "invalid request"},
 			wantStatus: http.StatusBadRequest,
 			wantError:  true,
 		},
@@ -93,8 +96,8 @@ func TestHandler_Register(t *testing.T) {
 
 			router.ServeHTTP(w, req)
 
-			if !tt.wantError && (w.Body.String() == "" || !bytes.Contains([]byte(w.Body.String()), []byte("id")) || !bytes.Contains([]byte(w.Body.String()), []byte("email"))) {
-				t.Errorf("expected user ID and email in response, got %s", w.Body.String())
+			if !tt.wantError && (w.Body.String() == "" || !bytes.Contains([]byte(w.Body.String()), []byte("user")) || !bytes.Contains([]byte(w.Body.String()), []byte("tokens"))) {
+				t.Errorf("expected auth response in response, got %s", w.Body.String())
 			}
 
 			if w.Code != tt.wantStatus {
@@ -118,38 +121,38 @@ func TestHandler_Login(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		request    dtos.V1LoginRequest
+		request    dtos.LoginRequest
 		response   any
 		wantStatus int
 		wantError  bool
 	}{
 		{
 			name: "valid login",
-			request: dtos.V1LoginRequest{
+			request: dtos.LoginRequest{
 				Email:    "test@example.com",
 				Password: "password123",
 			},
-			response:   dtos.V1TokenResponse{AccessToken: "mockAccessToken", RefreshToken: "mockRefreshToken"},
+			response:   dtos.AuthResponse{},
 			wantStatus: http.StatusOK,
 			wantError:  false,
 		},
 		{
 			name: "invalid password",
-			request: dtos.V1LoginRequest{
+			request: dtos.LoginRequest{
 				Email:    "test@example.com",
 				Password: "wrongpassword",
 			},
-			response:   dtos.V1ErrorResponse{Error: "invalid credentials"},
+			response:   dtos.ErrorResponse{Error: "invalid credentials"},
 			wantStatus: http.StatusUnauthorized,
 			wantError:  true,
 		},
 		{
 			name: "non-existent user",
-			request: dtos.V1LoginRequest{
+			request: dtos.LoginRequest{
 				Email:    "nonexistent@example.com",
 				Password: "password123",
 			},
-			response:   dtos.V1ErrorResponse{Error: "invalid credentials"},
+			response:   dtos.ErrorResponse{Error: "invalid credentials"},
 			wantStatus: http.StatusUnauthorized,
 			wantError:  true,
 		},
@@ -167,8 +170,8 @@ func TestHandler_Login(t *testing.T) {
 
 			router.ServeHTTP(w, req)
 
-			if !tt.wantError && (w.Body.String() == "" || !bytes.Contains([]byte(w.Body.String()), []byte("access_token")) || !bytes.Contains([]byte(w.Body.String()), []byte("refresh_token"))) {
-				t.Errorf("expected access and refresh tokens in response, got %s", w.Body.String())
+			if !tt.wantError && (w.Body.String() == "" || !bytes.Contains([]byte(w.Body.String()), []byte("user")) || !bytes.Contains([]byte(w.Body.String()), []byte("tokens"))) {
+				t.Errorf("expected auth response in body, got %s", w.Body.String())
 			}
 			if w.Code != tt.wantStatus {
 				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
@@ -190,33 +193,33 @@ func TestHandler_RefreshToken(t *testing.T) {
 		t.Fatalf("h.service.Register() error = %v", err)
 	}
 
-	tokens, err := h.service.Login("test@example.com", "password123")
+	loginResult, err := h.service.Login("test@example.com", "password123")
 	if err != nil {
 		t.Fatalf("h.service.Login() error = %v", err)
 	}
 
 	tests := []struct {
 		name       string
-		request    dtos.V1RefreshTokenRequest
+		request    dtos.RefreshTokenRequest
 		response   any
 		wantStatus int
 		wantError  bool
 	}{
 		{
 			name: "valid refresh token",
-			request: dtos.V1RefreshTokenRequest{
-				RefreshToken: tokens.RefreshToken,
+			request: dtos.RefreshTokenRequest{
+			RefreshToken: loginResult.Tokens.RefreshToken,
 			},
-			response:   dtos.V1TokenResponse{AccessToken: "mockAccessToken", RefreshToken: "mockRefreshToken"},
+			response:   dtos.TokenResponse{},
 			wantStatus: http.StatusOK,
 			wantError:  false,
 		},
 		{
 			name: "invalid refresh token",
-			request: dtos.V1RefreshTokenRequest{
+			request: dtos.RefreshTokenRequest{
 				RefreshToken: "invalidtoken",
 			},
-			response:   dtos.V1ErrorResponse{Error: "invalid refresh token"},
+			response:   dtos.ErrorResponse{Error: "invalid refresh token"},
 			wantStatus: http.StatusUnauthorized,
 			wantError:  true,
 		},
@@ -235,7 +238,7 @@ func TestHandler_RefreshToken(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if !tt.wantError && (w.Body.String() == "" || !bytes.Contains(w.Body.Bytes(), []byte("access_token")) || !bytes.Contains(w.Body.Bytes(), []byte("refresh_token"))) {
-				t.Errorf("expected access and refresh tokens in response, got %s", w.Body.String())
+				t.Errorf("expected token response in response, got %s", w.Body.String())
 			}
 			if w.Code != tt.wantStatus {
 				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
@@ -250,7 +253,7 @@ func TestHandler_Logout(t *testing.T) {
 		t.Fatalf("provideHandler() error = %v", err)
 	}
 
-	user, err := h.service.Register("test@example.com", "password123")
+	registerResult, err := h.service.Register("test@example.com", "password123")
 	if err != nil {
 		t.Fatalf("h.service.Register() error = %v", err)
 	}
@@ -281,9 +284,9 @@ func TestHandler_Logout(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
 			router.POST(apiRoute+"/auth/logout", func(c *gin.Context) {
-				if tt.setUserID {
-					c.Set("userID", user.ID.String())
-				}
+			if tt.setUserID {
+				c.Set("userID", registerResult.User.ID.String())
+			}
 				h.Logout(c)
 			})
 

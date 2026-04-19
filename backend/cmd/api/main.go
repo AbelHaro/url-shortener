@@ -12,6 +12,7 @@
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
+//
 //go:generate swag init -g main.go -o ../../docs --parseDependency --parseInternal
 package main
 

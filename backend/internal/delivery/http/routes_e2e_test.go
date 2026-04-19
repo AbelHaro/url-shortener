@@ -124,8 +124,8 @@ func cleanupDatabase(t *testing.T) {
 }
 
 // registerUserHelper registers a new user and returns the response
-func registerUserHelper(email, password string) (*dtos.V1UserResponse, error) {
-	registerBody := dtos.V1RegisterRequest{Email: email, Password: password}
+func registerUserHelper(email, password string) (*dtos.AuthResponse, error) {
+	registerBody := dtos.RegisterRequest{Email: email, Password: password}
 	body, _ := json.Marshal(registerBody)
 
 	w := httptest.NewRecorder()
@@ -136,22 +136,22 @@ func registerUserHelper(email, password string) (*dtos.V1UserResponse, error) {
 	testRouter.ServeHTTP(w, req)
 
 	if w.Code != http.StatusCreated {
-		var errResp dtos.V1ErrorResponse
+		var errResp dtos.ErrorResponse
 		json.Unmarshal(w.Body.Bytes(), &errResp)
 		return nil, fmt.Errorf("registration failed with status %d: %s", w.Code, errResp.Error)
 	}
 
-	var userResp dtos.V1UserResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &userResp); err != nil {
+	var authResp dtos.AuthResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &authResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal registration response: %w", err)
 	}
 
-	return &userResp, nil
+	return &authResp, nil
 }
 
-// loginUserHelper logs in a user and returns the token response
-func loginUserHelper(email, password string) (*dtos.V1TokenResponse, error) {
-	loginBody := dtos.V1LoginRequest{Email: email, Password: password}
+// loginUserHelper logs in a user and returns the auth response
+func loginUserHelper(email, password string) (*dtos.AuthResponse, error) {
+	loginBody := dtos.LoginRequest{Email: email, Password: password}
 	body, _ := json.Marshal(loginBody)
 
 	w := httptest.NewRecorder()
@@ -162,17 +162,17 @@ func loginUserHelper(email, password string) (*dtos.V1TokenResponse, error) {
 	testRouter.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		var errResp dtos.V1ErrorResponse
+		var errResp dtos.ErrorResponse
 		json.Unmarshal(w.Body.Bytes(), &errResp)
 		return nil, fmt.Errorf("login failed with status %d: %s", w.Code, errResp.Error)
 	}
 
-	var tokenResp dtos.V1TokenResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &tokenResp); err != nil {
+	var authResp dtos.AuthResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &authResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal login response: %w", err)
 	}
 
-	return &tokenResp, nil
+	return &authResp, nil
 }
 
 // makeRequest performs a request without authentication
@@ -194,7 +194,7 @@ func makeRequest(method, url string, body any) *httptest.ResponseRecorder {
 	return w
 }
 
-// makeAuthenticatedRequest performs a request with JWT token in Authorization header
+// makeAuthenticatedRequest performs a request with JWT token cookie
 func makeAuthenticatedRequest(method, url string, body any, token string) *httptest.ResponseRecorder {
 	var bodyReader *bytes.Reader
 	if body != nil {
@@ -207,7 +207,7 @@ func makeAuthenticatedRequest(method, url string, body any, token string) *httpt
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(method, url, bodyReader)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{Name: "access_token", Value: token})
 	req.Header.Set("Referer", "http://localhost:5173/")
 
 	testRouter.ServeHTTP(w, req)
@@ -215,17 +215,17 @@ func makeAuthenticatedRequest(method, url string, body any, token string) *httpt
 }
 
 // createShortenURLHelper creates a shortened URL and returns the response
-func createShortenURLHelper(originalURL string, token string) (*dtos.V1URLResponse, error) {
-	createReq := dtos.V1CreateShortenRequest{OriginalUrl: originalURL}
+func createShortenURLHelper(originalURL string, token string) (*dtos.URLResponse, error) {
+	createReq := dtos.CreateShortenRequest{OriginalUrl: originalURL}
 	w := makeAuthenticatedRequest("POST", "/api/v1/shorten", createReq, token)
 
 	if w.Code != http.StatusCreated {
-		var errResp dtos.V1ErrorResponse
+		var errResp dtos.ErrorResponse
 		json.Unmarshal(w.Body.Bytes(), &errResp)
 		return nil, fmt.Errorf("create shorten failed with status %d: %s", w.Code, errResp.Error)
 	}
 
-	var urlResp dtos.V1URLResponse
+	var urlResp dtos.URLResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &urlResp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal create shorten response: %w", err)
 	}
@@ -254,7 +254,7 @@ func Test_RegisterEndpoint(t *testing.T) {
 		name                 string
 		method               string
 		url                  string
-		requestBody          dtos.V1RegisterRequest
+		requestBody          dtos.RegisterRequest
 		expectedResponseBody any
 		expectedStatus       int
 	}{
@@ -262,19 +262,21 @@ func Test_RegisterEndpoint(t *testing.T) {
 			name:           "Valid registration",
 			method:         "POST",
 			url:            "/api/v1/auth/register",
-			requestBody:    dtos.V1RegisterRequest{Email: "test@example.com", Password: "password123"},
+			requestBody:    dtos.RegisterRequest{Email: "test@example.com", Password: "password123"},
 			expectedStatus: http.StatusCreated,
-			expectedResponseBody: &dtos.V1UserResponse{
-				Email: "test@example.com",
+			expectedResponseBody: &dtos.AuthResponse{
+				User: dtos.UserResponse{
+					Email: "test@example.com",
+				},
 			},
 		},
 		{
 			name:           "Invalid email",
 			method:         "POST",
 			url:            "/api/v1/auth/register",
-			requestBody:    dtos.V1RegisterRequest{Email: "invalid", Password: "password123"},
+			requestBody:    dtos.RegisterRequest{Email: "invalid", Password: "password123"},
 			expectedStatus: http.StatusBadRequest,
-			expectedResponseBody: &dtos.V1ErrorResponse{
+			expectedResponseBody: &dtos.ErrorResponse{
 				Error: "invalid request body",
 			},
 		},
@@ -282,9 +284,9 @@ func Test_RegisterEndpoint(t *testing.T) {
 			name:           "Short password",
 			method:         "POST",
 			url:            "/api/v1/auth/register",
-			requestBody:    dtos.V1RegisterRequest{Email: "test@example.com", Password: "short"},
+			requestBody:    dtos.RegisterRequest{Email: "test@example.com", Password: "short"},
 			expectedStatus: http.StatusBadRequest,
-			expectedResponseBody: &dtos.V1ErrorResponse{
+			expectedResponseBody: &dtos.ErrorResponse{
 				Error: "invalid request body",
 			},
 		},
@@ -304,15 +306,17 @@ func Test_RegisterEndpoint(t *testing.T) {
 
 			// Unmarshal response based on expected type
 			switch expected := tt.expectedResponseBody.(type) {
-			case *dtos.V1UserResponse:
-				var resp dtos.V1UserResponse
+			case *dtos.AuthResponse:
+				var resp dtos.AuthResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
-				if expected.Email != "" {
-					assert.Equal(t, expected.Email, resp.Email)
+				if expected.User.Email != "" {
+					assert.Equal(t, expected.User.Email, resp.User.Email)
 				}
-			case *dtos.V1ErrorResponse:
-				var resp dtos.V1ErrorResponse
+				assert.NotEmpty(t, resp.Tokens.AccessToken)
+				assert.NotEmpty(t, resp.Tokens.RefreshToken)
+			case *dtos.ErrorResponse:
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.Equal(t, expected.Error, resp.Error)
@@ -332,7 +336,7 @@ func Test_LoginEndpoint(t *testing.T) {
 		name                 string
 		method               string
 		url                  string
-		requestBody          dtos.V1LoginRequest
+		requestBody          dtos.LoginRequest
 		expectedResponseBody any
 		expectedStatus       int
 	}{
@@ -340,23 +344,23 @@ func Test_LoginEndpoint(t *testing.T) {
 			name:   "Valid login",
 			method: "POST",
 			url:    "/api/v1/auth/login",
-			requestBody: dtos.V1LoginRequest{
+			requestBody: dtos.LoginRequest{
 				Email:    "test@example.com",
 				Password: "password123",
 			},
 			expectedStatus:       http.StatusOK,
-			expectedResponseBody: &dtos.V1TokenResponse{},
+			expectedResponseBody: &dtos.AuthResponse{},
 		},
 		{
 			name:   "Invalid password",
 			method: "POST",
 			url:    "/api/v1/auth/login",
-			requestBody: dtos.V1LoginRequest{
+			requestBody: dtos.LoginRequest{
 				Email:    "test@example.com",
 				Password: "wrongpassword",
 			},
 			expectedStatus: http.StatusUnauthorized,
-			expectedResponseBody: &dtos.V1ErrorResponse{
+			expectedResponseBody: &dtos.ErrorResponse{
 				Error: "invalid credentials",
 			},
 		},
@@ -364,12 +368,12 @@ func Test_LoginEndpoint(t *testing.T) {
 			name:   "Non-existent user",
 			method: "POST",
 			url:    "/api/v1/auth/login",
-			requestBody: dtos.V1LoginRequest{
+			requestBody: dtos.LoginRequest{
 				Email:    "testinvalid@example.com",
 				Password: "password123",
 			},
 			expectedStatus: http.StatusUnauthorized,
-			expectedResponseBody: &dtos.V1ErrorResponse{
+			expectedResponseBody: &dtos.ErrorResponse{
 				Error: "invalid credentials",
 			},
 		},
@@ -377,12 +381,12 @@ func Test_LoginEndpoint(t *testing.T) {
 			name:   "Invalid login request body with missing password",
 			method: "POST",
 			url:    "/api/v1/auth/login",
-			requestBody: dtos.V1LoginRequest{
+			requestBody: dtos.LoginRequest{
 				Email:    "test@example.com",
 				Password: "",
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedResponseBody: &dtos.V1ErrorResponse{
+			expectedResponseBody: &dtos.ErrorResponse{
 				Error: "invalid request body",
 			},
 		},
@@ -390,12 +394,12 @@ func Test_LoginEndpoint(t *testing.T) {
 			name:   "Invalid login request body with missing email",
 			method: "POST",
 			url:    "/api/v1/auth/login",
-			requestBody: dtos.V1LoginRequest{
+			requestBody: dtos.LoginRequest{
 				Email:    "",
 				Password: "password123",
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedResponseBody: &dtos.V1ErrorResponse{
+			expectedResponseBody: &dtos.ErrorResponse{
 				Error: "invalid request body",
 			},
 		},
@@ -414,14 +418,14 @@ func Test_LoginEndpoint(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			switch expected := tt.expectedResponseBody.(type) {
-			case *dtos.V1TokenResponse:
-				var resp dtos.V1TokenResponse
+			case *dtos.AuthResponse:
+				var resp dtos.AuthResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
-				assert.NotEmpty(t, resp.AccessToken)
-				assert.NotEmpty(t, resp.RefreshToken)
-			case *dtos.V1ErrorResponse:
-				var resp dtos.V1ErrorResponse
+				assert.NotEmpty(t, resp.Tokens.AccessToken)
+				assert.NotEmpty(t, resp.Tokens.RefreshToken)
+			case *dtos.ErrorResponse:
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.Equal(t, expected.Error, resp.Error)
@@ -444,7 +448,7 @@ func Test_RefreshTokenEndpoint(t *testing.T) {
 		name                 string
 		method               string
 		url                  string
-		requestBody          dtos.V1RefreshTokenRequest
+		requestBody          dtos.RefreshTokenRequest
 		expectedResponseBody any
 		expectedStatus       int
 	}{
@@ -452,21 +456,21 @@ func Test_RefreshTokenEndpoint(t *testing.T) {
 			name:   "Valid refresh token",
 			method: "POST",
 			url:    "/api/v1/auth/refresh",
-			requestBody: dtos.V1RefreshTokenRequest{
-				RefreshToken: loginResp.RefreshToken,
+			requestBody: dtos.RefreshTokenRequest{
+				RefreshToken: loginResp.Tokens.RefreshToken,
 			},
 			expectedStatus:       http.StatusOK,
-			expectedResponseBody: &dtos.V1TokenResponse{},
+			expectedResponseBody: &dtos.TokenResponse{},
 		},
 		{
 			name:   "Invalid refresh token",
 			method: "POST",
 			url:    "/api/v1/auth/refresh",
-			requestBody: dtos.V1RefreshTokenRequest{
+			requestBody: dtos.RefreshTokenRequest{
 				RefreshToken: "invalid-token",
 			},
 			expectedStatus:       http.StatusUnauthorized,
-			expectedResponseBody: &dtos.V1ErrorResponse{},
+			expectedResponseBody: &dtos.ErrorResponse{},
 		},
 	}
 
@@ -483,14 +487,14 @@ func Test_RefreshTokenEndpoint(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			switch tt.expectedResponseBody.(type) {
-			case *dtos.V1TokenResponse:
-				var resp dtos.V1TokenResponse
+			case *dtos.TokenResponse:
+				var resp dtos.TokenResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.NotEmpty(t, resp.AccessToken)
 				assert.NotEmpty(t, resp.RefreshToken)
-			case *dtos.V1ErrorResponse:
-				var resp dtos.V1ErrorResponse
+			case *dtos.ErrorResponse:
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.Equal(t, "invalid token", resp.Error)
@@ -520,7 +524,7 @@ func Test_LogoutEndpoint(t *testing.T) {
 			name:           "Valid logout",
 			method:         "POST",
 			url:            "/api/v1/auth/logout",
-			accessToken:    loginResp.AccessToken,
+			accessToken:    loginResp.Tokens.AccessToken,
 			expectedStatus: http.StatusNoContent,
 		},
 		{
@@ -537,7 +541,7 @@ func Test_LogoutEndpoint(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, _ := http.NewRequest(tt.method, tt.url, nil)
 			if tt.accessToken != "" {
-				req.Header.Set("Authorization", "Bearer "+tt.accessToken)
+				req.AddCookie(&http.Cookie{Name: "access_token", Value: tt.accessToken})
 			}
 			req.Header.Set("Referer", "http://localhost:5173/")
 
@@ -546,10 +550,10 @@ func Test_LogoutEndpoint(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			if tt.expectedStatus == http.StatusUnauthorized {
-				var resp dtos.V1ErrorResponse
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
-				assert.Equal(t, "Authorization header required", resp.Error)
+				assert.Equal(t, "authorization token required", resp.Error)
 			}
 		})
 	}
@@ -565,13 +569,13 @@ func Test_ShortenEndpoint(t *testing.T) {
 	loginResp, err := loginUserHelper("test@example.com", "password123")
 	assert.NoError(t, err)
 
-	userID := uuid.MustParse(userResp.ID)
+	userID := uuid.MustParse(userResp.User.ID)
 
 	tests := []struct {
 		name                 string
 		method               string
 		url                  string
-		requestBody          dtos.V1CreateShortenRequest
+		requestBody          dtos.CreateShortenRequest
 		accessToken          string
 		expectedBodyResponse any
 		expectedStatus       int
@@ -580,11 +584,11 @@ func Test_ShortenEndpoint(t *testing.T) {
 			name:   "Valid shorten URL",
 			method: "POST",
 			url:    "/api/v1/shorten",
-			requestBody: dtos.V1CreateShortenRequest{
+			requestBody: dtos.CreateShortenRequest{
 				OriginalUrl: "https://www.example.com",
 			},
-			accessToken: loginResp.AccessToken,
-			expectedBodyResponse: &dtos.V1URLResponse{
+			accessToken: loginResp.Tokens.AccessToken,
+			expectedBodyResponse: &dtos.URLResponse{
 				OriginalURL: "https://www.example.com",
 				UserID:      userID,
 			},
@@ -594,11 +598,11 @@ func Test_ShortenEndpoint(t *testing.T) {
 			name:   "Invalid shorten URL with missing original URL",
 			method: "POST",
 			url:    "/api/v1/shorten",
-			requestBody: dtos.V1CreateShortenRequest{
+			requestBody: dtos.CreateShortenRequest{
 				OriginalUrl: "",
 			},
-			accessToken: loginResp.AccessToken,
-			expectedBodyResponse: &dtos.V1ErrorResponse{
+			accessToken: loginResp.Tokens.AccessToken,
+			expectedBodyResponse: &dtos.ErrorResponse{
 				Error: "invalid request body",
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -607,11 +611,11 @@ func Test_ShortenEndpoint(t *testing.T) {
 			name:   "Unauthorized shorten URL with fake token",
 			method: "POST",
 			url:    "/api/v1/shorten",
-			requestBody: dtos.V1CreateShortenRequest{
+			requestBody: dtos.CreateShortenRequest{
 				OriginalUrl: "https://www.example.com",
 			},
 			accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
-			expectedBodyResponse: &dtos.V1ErrorResponse{
+			expectedBodyResponse: &dtos.ErrorResponse{
 				Error: "Invalid token",
 			},
 			expectedStatus: http.StatusUnauthorized,
@@ -625,7 +629,7 @@ func Test_ShortenEndpoint(t *testing.T) {
 			req, _ := http.NewRequest(tt.method, tt.url, bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			if tt.accessToken != "" {
-				req.Header.Set("Authorization", "Bearer "+tt.accessToken)
+				req.AddCookie(&http.Cookie{Name: "access_token", Value: tt.accessToken})
 			}
 			req.Header.Set("Referer", "http://localhost:5173/")
 
@@ -634,15 +638,15 @@ func Test_ShortenEndpoint(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			switch expected := tt.expectedBodyResponse.(type) {
-			case *dtos.V1URLResponse:
-				var resp dtos.V1URLResponse
+			case *dtos.URLResponse:
+				var resp dtos.URLResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.Equal(t, expected.OriginalURL, resp.OriginalURL)
 				assert.Equal(t, expected.UserID, resp.UserID)
 				assert.NotEmpty(t, resp.ShortCode)
-			case *dtos.V1ErrorResponse:
-				var resp dtos.V1ErrorResponse
+			case *dtos.ErrorResponse:
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.Equal(t, expected.Error, resp.Error)
@@ -661,7 +665,7 @@ func Test_FindByShortCodeEndpoint(t *testing.T) {
 	loginResp, err := loginUserHelper("test@example.com", "password123")
 	assert.NoError(t, err)
 
-	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.AccessToken)
+	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.Tokens.AccessToken)
 	assert.NoError(t, err)
 
 	tests := []struct {
@@ -678,7 +682,7 @@ func Test_FindByShortCodeEndpoint(t *testing.T) {
 			method:         "GET",
 			url:            "/api/v1/urls/short/",
 			shortCode:      urlResp.ShortCode,
-			accessToken:    loginResp.AccessToken,
+			accessToken:    loginResp.Tokens.AccessToken,
 			expectedStatus: http.StatusOK,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
 				var resp domain.URL
@@ -693,10 +697,10 @@ func Test_FindByShortCodeEndpoint(t *testing.T) {
 			method:         "GET",
 			url:            "/api/v1/urls/short/",
 			shortCode:      "invalidcode",
-			accessToken:    loginResp.AccessToken,
+			accessToken:    loginResp.Tokens.AccessToken,
 			expectedStatus: http.StatusNotFound,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp dtos.V1ErrorResponse
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.NotEmpty(t, resp.Error)
@@ -708,13 +712,12 @@ func Test_FindByShortCodeEndpoint(t *testing.T) {
 			url:            "/api/v1/urls/short/",
 			shortCode:      urlResp.ShortCode,
 			accessToken:    "",
-			expectedStatus: http.StatusUnauthorized,
+			expectedStatus: http.StatusOK,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp dtos.V1ErrorResponse
+				var resp domain.URL
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
-				// The middleware returns "Invalid token" when no auth header is provided
-				assert.True(t, resp.Error == "Authorization header required" || resp.Error == "Invalid token")
+				assert.Equal(t, urlResp.ShortCode, resp.ShortCode)
 			},
 		},
 	}
@@ -743,7 +746,7 @@ func Test_FindByIDEndpoint(t *testing.T) {
 	loginResp, err := loginUserHelper("test@example.com", "password123")
 	assert.NoError(t, err)
 
-	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.AccessToken)
+	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.Tokens.AccessToken)
 	assert.NoError(t, err)
 
 	tests := []struct {
@@ -760,7 +763,7 @@ func Test_FindByIDEndpoint(t *testing.T) {
 			method:         "GET",
 			url:            "/api/v1/urls/",
 			id:             urlResp.ID.String(),
-			accessToken:    loginResp.AccessToken,
+			accessToken:    loginResp.Tokens.AccessToken,
 			expectedStatus: http.StatusOK,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
 				var resp domain.URL
@@ -774,10 +777,10 @@ func Test_FindByIDEndpoint(t *testing.T) {
 			method:         "GET",
 			url:            "/api/v1/urls/",
 			id:             uuid.New().String(),
-			accessToken:    loginResp.AccessToken,
+			accessToken:    loginResp.Tokens.AccessToken,
 			expectedStatus: http.StatusNotFound,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp dtos.V1ErrorResponse
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.NotEmpty(t, resp.Error)
@@ -788,10 +791,10 @@ func Test_FindByIDEndpoint(t *testing.T) {
 			method:         "GET",
 			url:            "/api/v1/urls/",
 			id:             "invalid-uuid",
-			accessToken:    loginResp.AccessToken,
+			accessToken:    loginResp.Tokens.AccessToken,
 			expectedStatus: http.StatusInternalServerError,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp dtos.V1ErrorResponse
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.NotEmpty(t, resp.Error)
@@ -805,11 +808,11 @@ func Test_FindByIDEndpoint(t *testing.T) {
 			accessToken:    "",
 			expectedStatus: http.StatusUnauthorized,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp dtos.V1ErrorResponse
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
-				// The middleware returns "Invalid token" when no auth header is provided
-				assert.True(t, resp.Error == "Authorization header required" || resp.Error == "Invalid token")
+				// The middleware returns "Invalid token" when no auth cookie is provided
+				assert.True(t, resp.Error == "authorization token required" || resp.Error == "Invalid token")
 			},
 		},
 	}
@@ -838,7 +841,7 @@ func Test_DeleteByIDEndpoint(t *testing.T) {
 	loginResp, err := loginUserHelper("test@example.com", "password123")
 	assert.NoError(t, err)
 
-	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.AccessToken)
+	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.Tokens.AccessToken)
 	assert.NoError(t, err)
 
 	tests := []struct {
@@ -855,11 +858,11 @@ func Test_DeleteByIDEndpoint(t *testing.T) {
 			method:         "DELETE",
 			url:            "/api/v1/urls/",
 			id:             urlResp.ID.String(),
-			accessToken:    loginResp.AccessToken,
+			accessToken:    loginResp.Tokens.AccessToken,
 			expectedStatus: http.StatusNoContent,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
 				// After deletion, verify URL doesn't exist
-				verifyW := makeAuthenticatedRequest("GET", "/api/v1/urls/"+urlResp.ID.String(), nil, loginResp.AccessToken)
+				verifyW := makeAuthenticatedRequest("GET", "/api/v1/urls/"+urlResp.ID.String(), nil, loginResp.Tokens.AccessToken)
 				assert.Equal(t, http.StatusNotFound, verifyW.Code)
 			},
 		},
@@ -868,10 +871,10 @@ func Test_DeleteByIDEndpoint(t *testing.T) {
 			method:         "DELETE",
 			url:            "/api/v1/urls/",
 			id:             uuid.New().String(),
-			accessToken:    loginResp.AccessToken,
+			accessToken:    loginResp.Tokens.AccessToken,
 			expectedStatus: http.StatusNotFound,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp dtos.V1ErrorResponse
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.NotEmpty(t, resp.Error)
@@ -885,11 +888,11 @@ func Test_DeleteByIDEndpoint(t *testing.T) {
 			accessToken:    "",
 			expectedStatus: http.StatusUnauthorized,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp dtos.V1ErrorResponse
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
-				// The middleware returns "Invalid token" when no auth header is provided
-				assert.True(t, resp.Error == "Authorization header required" || resp.Error == "Invalid token")
+				// The middleware returns "Invalid token" when no auth cookie is provided
+				assert.True(t, resp.Error == "authorization token required" || resp.Error == "Invalid token")
 			},
 		},
 	}
@@ -918,14 +921,14 @@ func Test_SearchByOriginalURLEndpoint(t *testing.T) {
 	loginResp, err := loginUserHelper("test@example.com", "password123")
 	assert.NoError(t, err)
 
-	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.AccessToken)
+	urlResp, err := createShortenURLHelper("https://www.example.com", loginResp.Tokens.AccessToken)
 	assert.NoError(t, err)
 
 	tests := []struct {
 		name           string
 		method         string
 		url            string
-		requestBody    dtos.V1SearchByOriginalURLRequest
+		requestBody    dtos.SearchByOriginalURLRequest
 		accessToken    string
 		expectedStatus int
 		assertions     func(t *testing.T, w *httptest.ResponseRecorder)
@@ -934,10 +937,10 @@ func Test_SearchByOriginalURLEndpoint(t *testing.T) {
 			name:   "Valid search by original URL",
 			method: "POST",
 			url:    "/api/v1/urls/search",
-			requestBody: dtos.V1SearchByOriginalURLRequest{
-				URL: "https://www.example.com",
+			requestBody: dtos.SearchByOriginalURLRequest{
+				OriginalURL: "https://www.example.com",
 			},
-			accessToken:    loginResp.AccessToken,
+			accessToken:    loginResp.Tokens.AccessToken,
 			expectedStatus: http.StatusOK,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
 				var resp domain.URL
@@ -951,13 +954,13 @@ func Test_SearchByOriginalURLEndpoint(t *testing.T) {
 			name:   "Search for non-existent URL returns 500 (backend behavior)",
 			method: "POST",
 			url:    "/api/v1/urls/search",
-			requestBody: dtos.V1SearchByOriginalURLRequest{
-				URL: "https://nonexistent.com",
+			requestBody: dtos.SearchByOriginalURLRequest{
+				OriginalURL: "https://nonexistent.com",
 			},
-			accessToken:    loginResp.AccessToken,
+			accessToken:    loginResp.Tokens.AccessToken,
 			expectedStatus: http.StatusInternalServerError,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp dtos.V1ErrorResponse
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.Equal(t, "internal server error", resp.Error)
@@ -967,13 +970,13 @@ func Test_SearchByOriginalURLEndpoint(t *testing.T) {
 			name:   "Invalid request body (missing URL)",
 			method: "POST",
 			url:    "/api/v1/urls/search",
-			requestBody: dtos.V1SearchByOriginalURLRequest{
-				URL: "",
+			requestBody: dtos.SearchByOriginalURLRequest{
+				OriginalURL: "",
 			},
-			accessToken:    loginResp.AccessToken,
+			accessToken:    loginResp.Tokens.AccessToken,
 			expectedStatus: http.StatusBadRequest,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp dtos.V1ErrorResponse
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
 				assert.Equal(t, "invalid request body", resp.Error)
@@ -983,17 +986,17 @@ func Test_SearchByOriginalURLEndpoint(t *testing.T) {
 			name:   "Missing authentication token",
 			method: "POST",
 			url:    "/api/v1/urls/search",
-			requestBody: dtos.V1SearchByOriginalURLRequest{
-				URL: "https://www.example.com",
+			requestBody: dtos.SearchByOriginalURLRequest{
+				OriginalURL: "https://www.example.com",
 			},
 			accessToken:    "",
 			expectedStatus: http.StatusUnauthorized,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
-				var resp dtos.V1ErrorResponse
+				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				assert.NoError(t, err)
-				// The middleware returns "Invalid token" when no auth header is provided
-				assert.True(t, resp.Error == "Authorization header required" || resp.Error == "Invalid token")
+				// The middleware returns "Invalid token" when no auth cookie is provided
+				assert.True(t, resp.Error == "authorization token required" || resp.Error == "Invalid token")
 			},
 		},
 	}
@@ -1030,7 +1033,7 @@ func Test_BulkShortenURLs_Counter_Range_Rotation(t *testing.T) {
 
 	for i := 0; i < numURLs; i++ {
 		originalURL := fmt.Sprintf("https://example.com/test%d", i)
-		urlResp, err := createShortenURLHelper(originalURL, loginResp.AccessToken)
+		urlResp, err := createShortenURLHelper(originalURL, loginResp.Tokens.AccessToken)
 
 		// Some requests might fail due to range exhaustion/allocation race conditions
 		// This is expected behavior and we continue with the next URL
@@ -1062,7 +1065,7 @@ func Test_BulkShortenURLs_Counter_Range_Rotation(t *testing.T) {
 	assert.Equal(t, createdCount, len(shortCodes), "Expected %d unique short codes, got %d", createdCount, len(shortCodes))
 
 	// Verify we can retrieve the last successfully created URL
-	w := makeAuthenticatedRequest("GET", fmt.Sprintf("/api/v1/urls/%s", lastURLID.String()), nil, loginResp.AccessToken)
+	w := makeAuthenticatedRequest("GET", fmt.Sprintf("/api/v1/urls/%s", lastURLID.String()), nil, loginResp.Tokens.AccessToken)
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var lastURL domain.URL

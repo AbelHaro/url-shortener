@@ -57,8 +57,10 @@ func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.H
 		authGroup := api.Group("/auth")
 		{
 			authGroup.POST("/register", authHandler.Register)
+			authGroup.POST("/anonymous", authHandler.AnonymousRegister)
 			authGroup.POST("/login", authHandler.Login)
 			authGroup.POST("/refresh", authHandler.RefreshToken)
+			authGroup.GET("/session", jwtMiddleware.Authenticate(), authHandler.Session)
 		}
 
 		authProtected := api.Group("/auth")
@@ -68,10 +70,10 @@ func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.H
 		}
 
 		urls := api.Group("")
+		urls.GET("/urls/short/:shortCode", urlHandler.FindByShortCode)
 		urls.Use(jwtMiddleware.Authenticate())
 		{
 			urls.POST("/shorten", urlHandler.Create)
-			urls.GET("/urls/short/:shortCode", urlHandler.FindByShortCode)
 			urls.GET("/urls/:id", urlHandler.FindByID)
 			urls.DELETE("/urls/:id", urlHandler.DeleteByID)
 			urls.POST("/urls/search", urlHandler.FindByOriginalURL)
@@ -107,9 +109,9 @@ func NewConfiguredRouter(db *gorm.DB, appConfig *config.AppConfig) (*gin.Engine,
 	// Initialize handlers and middleware
 	urlHandler := url.NewHandler(urlService)
 	healthHandler := health.NewHandler()
-	authHandler := auth.NewHandler(authService)
+	authHandler := auth.NewHandler(authService, appConfig.Production)
 	refererMiddleware := middleware.NewRefererMiddleware()
-	jwtMiddleware := middleware.NewJWTMiddleware(authService)
+	jwtMiddleware := middleware.NewJWTMiddleware(authService, appConfig.Production)
 
 	// Setup routes
 	SetupRoutes(router, urlHandler, healthHandler, authHandler, refererMiddleware, jwtMiddleware)

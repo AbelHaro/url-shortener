@@ -22,6 +22,14 @@ func NewService(secret string, accessTTL, refreshTTL time.Duration) *Service {
 	}
 }
 
+func (s *Service) AccessTTL() time.Duration {
+	return s.accessTTL
+}
+
+func (s *Service) RefreshTTL() time.Duration {
+	return s.refreshTTL
+}
+
 func (s *Service) GenerateAccessToken(userID uuid.UUID, email string) (string, error) {
 	claims := jwt.MapClaims{
 		"sub":   userID.String(),
@@ -33,6 +41,10 @@ func (s *Service) GenerateAccessToken(userID uuid.UUID, email string) (string, e
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(s.secret)
+}
+
+func (s *Service) ValidateAccessTokenClaims(tokenString string) (jwt.MapClaims, error) {
+	return s.ValidateAccessToken(tokenString)
 }
 
 func (s *Service) GenerateRefreshToken(userID uuid.UUID) (string, error) {
