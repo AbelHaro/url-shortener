@@ -25,13 +25,19 @@ import (
 	"gorm.io/gorm"
 )
 
-func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.Handler, authHandler *auth.Handler, refererMiddleware *middleware.RefererMiddleware, jwtMiddleware *middleware.JWTMiddleware) *gin.Engine {
+func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.Handler, authHandler *auth.Handler, authService *authSvc.Service, appConfig *config.AppConfig) *gin.Engine {
 	docs.SwaggerInfo.Title = "URL Shortener API"
 	docs.SwaggerInfo.Description = "API for shortening and managing URLs"
 	docs.SwaggerInfo.Version = "1.0"
 	docs.SwaggerInfo.Host = "localhost:8080"
 	docs.SwaggerInfo.BasePath = "/api/v1"
 	docs.SwaggerInfo.Schemes = []string{"http"}
+
+	// Create all middlewares
+	refererMiddleware := middleware.NewRefererMiddleware()
+	jwtMiddleware := middleware.NewJWTMiddleware(authService, appConfig.Production)
+	// In debug mode (tests), disable rate limiting to allow bulk test requests
+	rateLimitMiddleware := middleware.NewRateLimitMiddleware(100, time.Minute, gin.IsDebugging())
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173", "https://url-shortener.abelharo.me"},
@@ -42,7 +48,7 @@ func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.H
 		MaxAge:           12 * time.Hour,
 	}))
 
-	r.GET("/health", healthHandler.Health)
+	r.GET("/health", rateLimitMiddleware.Limit(), healthHandler.Health)
 
 	if gin.IsDebugging() {
 		r.GET("/swagger/*any", ginSwagger.WrapHandler(
@@ -52,6 +58,7 @@ func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.H
 	}
 
 	api := r.Group("/api/v1")
+	api.Use(rateLimitMiddleware.Limit())
 	api.Use(refererMiddleware.Authenticate())
 	{
 		authGroup := api.Group("/auth")
@@ -106,15 +113,13 @@ func NewConfiguredRouter(db *gorm.DB, appConfig *config.AppConfig) (*gin.Engine,
 	jwtService := jwtSvc.NewService(appConfig.JWTSecret, appConfig.AccessTTL, appConfig.RefreshTTL)
 	authService := authSvc.NewService(authRepoInstance, jwtService)
 
-	// Initialize handlers and middleware
+	// Initialize handlers
 	urlHandler := url.NewHandler(urlService)
 	healthHandler := health.NewHandler()
 	authHandler := auth.NewHandler(authService, appConfig.Production)
-	refererMiddleware := middleware.NewRefererMiddleware()
-	jwtMiddleware := middleware.NewJWTMiddleware(authService, appConfig.Production)
 
-	// Setup routes
-	SetupRoutes(router, urlHandler, healthHandler, authHandler, refererMiddleware, jwtMiddleware)
+	// Setup routes (all middlewares are created inside SetupRoutes)
+	SetupRoutes(router, urlHandler, healthHandler, authHandler, authService, appConfig)
 
 	return router, nil
 }

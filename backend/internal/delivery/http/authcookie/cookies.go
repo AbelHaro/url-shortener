@@ -9,7 +9,7 @@ import (
 
 const (
 	AccessTokenCookieName  = "access_token"
-	RefreshTokenCookieName  = "refresh_token"
+	RefreshTokenCookieName = "refresh_token"
 	AuthCookiePath         = "/"
 	AuthCookieSameSiteMode = http.SameSiteStrictMode
 )

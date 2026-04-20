@@ -208,7 +208,7 @@ func TestHandler_RefreshToken(t *testing.T) {
 		{
 			name: "valid refresh token",
 			request: dtos.RefreshTokenRequest{
-			RefreshToken: loginResult.Tokens.RefreshToken,
+				RefreshToken: loginResult.Tokens.RefreshToken,
 			},
 			response:   dtos.TokenResponse{},
 			wantStatus: http.StatusOK,
@@ -284,9 +284,9 @@ func TestHandler_Logout(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
 			router.POST(apiRoute+"/auth/logout", func(c *gin.Context) {
-			if tt.setUserID {
-				c.Set("userID", registerResult.User.ID.String())
-			}
+				if tt.setUserID {
+					c.Set("userID", registerResult.User.ID.String())
+				}
 				h.Logout(c)
 			})
 
