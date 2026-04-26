@@ -13,26 +13,47 @@ export function useSession() {
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState<SessionUser | null>(null);
 
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const response = await fetch(`${apiBaseURL}/auth/session`, {
-          credentials: "include",
-        });
+  const checkSession = async () => {
+    try {
+      const response = await fetch(`${apiBaseURL}/auth/session`, {
+        credentials: "include",
+      });
 
-        setAuthenticated(response.ok);
-        if (response.ok) {
-          const data = (await response.json()) as { user?: SessionUser };
-          setUser(data.user ?? null);
-        } else {
-          setUser(null);
-        }
-      } finally {
-        setLoading(false);
+      setAuthenticated(response.ok);
+      if (response.ok) {
+        const data = (await response.json()) as { user?: SessionUser };
+        setUser(data.user ?? null);
+      } else {
+        setUser(null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void checkSession();
+  }, []);
+
+  // Re-check session when tab regains focus
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        void checkSession();
       }
     };
 
-    void checkSession();
+    const handleFocus = () => {
+      void checkSession();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, []);
 
   return { loading, authenticated, user };

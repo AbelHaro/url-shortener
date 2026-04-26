@@ -104,3 +104,15 @@ func (m *MockRepository) DeleteUser(userID string) error {
 	delete(m.users, userID)
 	return nil
 }
+
+func (m *MockRepository) UpdateRefreshTokenExpiration(token string) error {
+	rt, ok := m.refreshTokens[token]
+	if !ok {
+		return domain.ErrInvalidToken
+	}
+
+	rt.ValidUntil = time.Now().Add(7 * 24 * time.Hour)
+	rt.UpdatedAt = time.Now()
+	m.refreshTokens[token] = rt
+	return nil
+}

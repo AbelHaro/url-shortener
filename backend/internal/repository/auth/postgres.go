@@ -163,3 +163,26 @@ func (repo *PostgresRepository) Logout(userID string) error {
 
 	return nil
 }
+
+func (repo *PostgresRepository) UpdateRefreshTokenExpiration(token string) error {
+	ctx := context.Background()
+
+	var refreshToken domain.RefreshToken
+	result := repo.db.WithContext(ctx).Where("token = ?", token).First(&refreshToken)
+	if result.Error != nil {
+		return domain.ErrInvalidToken
+	}
+
+	// Only update if 10+ minutes have passed since last update
+	if time.Since(refreshToken.UpdatedAt) < 10*time.Minute {
+		return nil
+	}
+
+	newValidUntil := time.Now().Add(7 * 24 * time.Hour)
+	result = repo.db.WithContext(ctx).Model(&domain.RefreshToken{}).Where("token = ?", token).Update("valid_until", newValidUntil)
+	if result.Error != nil {
+		return domain.ErrInternal
+	}
+
+	return nil
+}

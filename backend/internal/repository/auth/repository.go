@@ -14,4 +14,5 @@ type Repository interface {
 	InvalidateRefreshToken(token string) error
 	Logout(userID string) error
 	DeleteUser(userID string) error
+	UpdateRefreshTokenExpiration(token string) error
 }

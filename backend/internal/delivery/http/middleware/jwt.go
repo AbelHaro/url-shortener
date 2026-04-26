@@ -63,6 +63,14 @@ func (m *JWTMiddleware) Authenticate() gin.HandlerFunc {
 			}
 		}
 
+		// Update refresh token expiration if 10+ minutes have passed since last update
+		if refreshToken, err := c.Cookie(authcookie.RefreshTokenCookieName); err == nil && refreshToken != "" {
+			if err := m.authService.UpdateRefreshTokenExpiration(refreshToken); err != nil {
+				// Log error but don't fail authentication - refresh token will still work until it expires
+				fmt.Printf("Failed to update refresh token expiration: %v\n", err)
+			}
+		}
+
 		c.Set("userID", userID.String())
 		c.Next()
 	}

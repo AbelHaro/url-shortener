@@ -26,10 +26,7 @@ export function Landing() {
             </ul>
           </div>
           <Button asChild className="w-full">
-            <Link to="/login">Login to shorten a URL</Link>
-          </Button>
-          <Button asChild variant="outline" className="w-full">
-            <Link to="/register">Create an account</Link>
+            <Link to="/short">Go to shorten</Link>
           </Button>
         </CardContent>
       </Card>

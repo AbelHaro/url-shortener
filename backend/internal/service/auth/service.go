@@ -234,3 +234,7 @@ func (s *Service) Logout(userID string) error {
 func (s *Service) DeleteUser(userID string) error {
 	return s.repo.DeleteUser(userID)
 }
+
+func (s *Service) UpdateRefreshTokenExpiration(refreshToken string) error {
+	return s.repo.UpdateRefreshTokenExpiration(refreshToken)
+}
