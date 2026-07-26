@@ -1,78 +1,68 @@
 services:
   db:
     image: postgres:18
-    container_name: url-shortener-postgres-db
     environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME}
+      POSTGRES_USER: ${DB_USER:-url_shortener}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-url_shortener}
     volumes:
       - postgres_data:/var/lib/postgresql
-    networks:
-      - dokploy-network
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   backend:
-    image: abelharo2/url-shortener-backend:latest
-    pull_policy: always
-    container_name: url-shortener-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
-      - APP_HOST=0.0.0.0
-      - APP_PORT=8080
-      - JWT_SECRET=${JWT_SECRET}
-      - PRODUCTION=${PRODUCTION}
-      - GIN_MODE=release
-      - TRUSTED_PROXIES=0.0.0.0/0
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-url_shortener}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in Coolify}
+      DB_NAME: ${DB_NAME:-url_shortener}
+      APP_HOST: 0.0.0.0
+      APP_PORT: "8080"
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in Coolify}
+      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-15m}
+      JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL:-168h}
+      # The bundled PostgreSQL service does not expose TLS.
+      PRODUCTION: ${PRODUCTION:-false}
+      GIN_MODE: release
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-0.0.0.0/0}
     expose:
-      - 8080
-    networks:
-      - dokploy-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.backend.rule=Host(`api-url-shortener.abelharo.me`)
-      - traefik.http.routers.backend.entrypoints=websecure
-      - traefik.http.routers.backend.tls.certresolver=letsencrypt
-      - traefik.http.services.backend.loadbalancer.server.port=8080
-      - com.centurylinklabs.watchtower.enable=true
+      - "8080"
     depends_on:
       db:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
-    image: abelharo2/url-shortener-frontend:latest
-    pull_policy: always
-    container_name: url-shortener-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set the public backend URL ending in /api/v1}
     expose:
-      - 80
-    networks:
-      - dokploy-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.frontend.rule=Host(`url-shortener.abelharo.me`)
-      - traefik.http.routers.frontend.entrypoints=websecure
-      - traefik.http.routers.frontend.tls.certresolver=letsencrypt
-      - traefik.http.services.frontend.loadbalancer.server.port=80
-      - com.centurylinklabs.watchtower.enable=true
+      - "80"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://127.0.0.1/health || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
-
-  watchtower:
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /root/.docker/config.json:/config.json
-    command: --interval 30 --label-enable
-
-networks:
-  dokploy-network:
-    external: true
 
 volumes:
   postgres_data:
