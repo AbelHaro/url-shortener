@@ -18,9 +18,8 @@ services:
     restart: unless-stopped
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: abelharo2/url-shortener-backend:${IMAGE_TAG:-latest}
+    pull_policy: always
     environment:
       DB_HOST: db
       DB_PORT: "5432"
@@ -44,11 +43,8 @@ services:
     restart: unless-stopped
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set the public backend URL ending in /api/v1}
+    image: abelharo2/url-shortener-frontend:${IMAGE_TAG:-latest}
+    pull_policy: always
     expose:
       - "80"
     healthcheck:
