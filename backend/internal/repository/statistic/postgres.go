@@ -2,6 +2,7 @@ package statistic
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
@@ -11,70 +12,92 @@ import (
 
 var _ Repository = (*PostgresRepository)(nil)
 
+// PostgresRepository persists and aggregates URL click statistics.
 type PostgresRepository struct {
 	db *gorm.DB
 }
 
+// NewPostgresRepository creates a PostgreSQL statistics repository.
 func NewPostgresRepository(db *gorm.DB) Repository {
 	return &PostgresRepository{db: db}
 }
 
-func (repo PostgresRepository) RecordClick(stat *domain.URLStatistics) error {
-	ctx := context.Background()
-
-	result := repo.db.WithContext(ctx).Create(stat)
-	if result.Error != nil {
-		return domain.ErrInternal
+// RecordClick persists a click event.
+func (repo PostgresRepository) RecordClick(ctx context.Context, stat *domain.URLStatistics) error {
+	if err := repo.db.WithContext(ctx).Create(stat).Error; err != nil {
+		return fmt.Errorf("record click: %w", domain.ErrInternal)
 	}
 	return nil
 }
 
-func (repo PostgresRepository) GetStatistics(urlID string) ([]*domain.URLStatistics, error) {
-	ctx := context.Background()
-
-	urlIDParsed, err := uuid.Parse(urlID)
-	if err != nil {
-		return nil, domain.ErrInvalidURL
-	}
-
-	var statistics []*domain.URLStatistics
-	result := repo.db.WithContext(ctx).Where("url_id = ?", urlIDParsed).Order("clicked_at DESC").Find(&statistics)
-	if result.Error != nil {
-		return nil, domain.ErrInternal
-	}
-
-	return statistics, nil
-}
-
-func (repo PostgresRepository) GetClickCount(urlID string) (int64, error) {
-	ctx := context.Background()
-
-	urlIDParsed, err := uuid.Parse(urlID)
-	if err != nil {
-		return 0, domain.ErrInvalidURL
-	}
-
+// GetClickCount returns the all-time click total for a URL.
+func (repo PostgresRepository) GetClickCount(ctx context.Context, urlID uuid.UUID) (int64, error) {
 	var count int64
-	result := repo.db.WithContext(ctx).Model(&domain.URLStatistics{}).Where("url_id = ?", urlIDParsed).Count(&count)
-	if result.Error != nil {
-		return 0, domain.ErrInternal
+	if err := repo.db.WithContext(ctx).
+		Model(&domain.URLStatistics{}).
+		Where("url_id = ?", urlID).
+		Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("count clicks: %w", domain.ErrInternal)
 	}
 	return count, nil
 }
 
-func (repo PostgresRepository) GetLastAccessAt(urlID string) (time.Time, error) {
-	ctx := context.Background()
-
-	urlIDParsed, err := uuid.Parse(urlID)
-	if err != nil {
-		return time.Time{}, domain.ErrInvalidURL
+// GetLastAccessAt returns the latest click timestamp, if any.
+func (repo PostgresRepository) GetLastAccessAt(ctx context.Context, urlID uuid.UUID) (*time.Time, error) {
+	var result struct {
+		LastClickedAt *time.Time
 	}
-
-	var lastAccess time.Time
-	result := repo.db.WithContext(ctx).Model(&domain.URLStatistics{}).Select("MAX(clicked_at)").Where("url_id = ?", urlIDParsed).Scan(&lastAccess)
-	if result.Error != nil {
-		return time.Time{}, domain.ErrInternal
+	if err := repo.db.WithContext(ctx).
+		Model(&domain.URLStatistics{}).
+		Select("MAX(clicked_at) AS last_clicked_at").
+		Where("url_id = ?", urlID).
+		Scan(&result).Error; err != nil {
+		return nil, fmt.Errorf("get last click: %w", domain.ErrInternal)
 	}
+	return result.LastClickedAt, nil
+}
 
-	return lastAccess, nil
+// GetClicksByDay returns UTC daily click totals from the supplied day onward.
+func (repo PostgresRepository) GetClicksByDay(ctx context.Context, urlID uuid.UUID, since time.Time) ([]domain.DailyClick, error) {
+	var clicks []domain.DailyClick
+	if err := repo.db.WithContext(ctx).
+		Model(&domain.URLStatistics{}).
+		Select("DATE(clicked_at AT TIME ZONE 'UTC') AS date, COUNT(*) AS clicks").
+		Where("url_id = ? AND clicked_at >= ?", urlID, since).
+		Group("DATE(clicked_at AT TIME ZONE 'UTC')").
+		Order("date ASC").
+		Scan(&clicks).Error; err != nil {
+		return nil, fmt.Errorf("get daily clicks: %w", domain.ErrInternal)
+	}
+	return clicks, nil
+}
+
+// GetTopReferrers returns the most frequent referrers in descending order.
+func (repo PostgresRepository) GetTopReferrers(ctx context.Context, urlID uuid.UUID, limit int) ([]domain.ReferrerCount, error) {
+	var referrers []domain.ReferrerCount
+	if err := repo.db.WithContext(ctx).
+		Model(&domain.URLStatistics{}).
+		Select("referer AS referrer, COUNT(*) AS clicks").
+		Where("url_id = ?", urlID).
+		Group("referer").
+		Order("clicks DESC, referrer ASC").
+		Limit(limit).
+		Scan(&referrers).Error; err != nil {
+		return nil, fmt.Errorf("get top referrers: %w", domain.ErrInternal)
+	}
+	return referrers, nil
+}
+
+// GetRecentClicks returns the latest click events in descending order.
+func (repo PostgresRepository) GetRecentClicks(ctx context.Context, urlID uuid.UUID, limit int) ([]domain.URLStatistics, error) {
+	var clicks []domain.URLStatistics
+	if err := repo.db.WithContext(ctx).
+		Select("id", "url_id", "clicked_at", "referer").
+		Where("url_id = ?", urlID).
+		Order("clicked_at DESC").
+		Limit(limit).
+		Find(&clicks).Error; err != nil {
+		return nil, fmt.Errorf("get recent clicks: %w", domain.ErrInternal)
+	}
+	return clicks, nil
 }

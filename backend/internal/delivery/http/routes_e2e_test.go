@@ -787,12 +787,12 @@ func Test_FindByIDEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name:           "Invalid UUID format returns 500 (backend behavior)",
+			name:           "Invalid UUID format",
 			method:         "GET",
 			url:            "/api/v1/urls/",
 			id:             "invalid-uuid",
 			accessToken:    loginResp.Tokens.AccessToken,
-			expectedStatus: http.StatusInternalServerError,
+			expectedStatus: http.StatusBadRequest,
 			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
 				var resp dtos.ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
@@ -829,6 +829,93 @@ func Test_FindByIDEndpoint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_URLStatisticsEndpoints(t *testing.T) {
+	cleanupDatabase(t)
+
+	_, err := registerUserHelper("analytics-owner@example.com", "password123")
+	assert.NoError(t, err)
+	owner, err := loginUserHelper("analytics-owner@example.com", "password123")
+	assert.NoError(t, err)
+	storedURL, err := createShortenURLHelper("https://analytics.example/path", owner.Tokens.AccessToken)
+	assert.NoError(t, err)
+	duplicateURL, err := createShortenURLHelper("https://analytics.example/path", owner.Tokens.AccessToken)
+	assert.NoError(t, err)
+	assert.NotEqual(t, storedURL.ID, duplicateURL.ID)
+	assert.NotEqual(t, storedURL.ShortCode, duplicateURL.ShortCode)
+
+	originalShortCode := storedURL.ShortCode
+	updateResponse := makeAuthenticatedRequest(
+		http.MethodPatch,
+		"/api/v1/urls/"+storedURL.ID.String(),
+		dtos.UpdateURLRequest{OriginalURL: "https://updated.example/destination"},
+		owner.Tokens.AccessToken,
+	)
+	assert.Equal(t, http.StatusOK, updateResponse.Code, updateResponse.Body.String())
+	var updatedURL dtos.URLResponse
+	assert.NoError(t, json.Unmarshal(updateResponse.Body.Bytes(), &updatedURL))
+	assert.Equal(t, originalShortCode, updatedURL.ShortCode)
+	assert.Equal(t, "https://updated.example/destination", updatedURL.OriginalURL)
+
+	resolvePath := "/api/v1/urls/short/" + storedURL.ShortCode + "/resolve"
+	referrers := []string{
+		"https://news.example/article/1",
+		"https://news.example/article/2",
+		"",
+	}
+	for _, referrer := range referrers {
+		response := makeRequest(http.MethodPost, resolvePath, dtos.ResolveShortURLRequest{Referrer: referrer})
+		assert.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		var resolution dtos.ResolveShortURLResponse
+		assert.NoError(t, json.Unmarshal(response.Body.Bytes(), &resolution))
+		assert.Equal(t, "https://updated.example/destination", resolution.OriginalURL)
+	}
+
+	unknownResponse := makeRequest(http.MethodPost, "/api/v1/urls/short/missing/resolve", dtos.ResolveShortURLRequest{})
+	assert.Equal(t, http.StatusNotFound, unknownResponse.Code)
+
+	statisticsPath := "/api/v1/urls/" + storedURL.ID.String() + "/statistics"
+	response := makeAuthenticatedRequest(http.MethodGet, statisticsPath, nil, owner.Tokens.AccessToken)
+	assert.Equal(t, http.StatusOK, response.Code, response.Body.String())
+
+	var statistics dtos.URLStatisticsResponse
+	assert.NoError(t, json.Unmarshal(response.Body.Bytes(), &statistics))
+	assert.Equal(t, int64(3), statistics.TotalClicks)
+	assert.NotNil(t, statistics.LastClickedAt)
+	assert.Len(t, statistics.ClicksByDay, 30)
+	assert.Len(t, statistics.RecentClicks, 3)
+	assert.Len(t, statistics.TopReferrers, 2)
+	assert.Equal(t, "news.example", statistics.TopReferrers[0].Referrer)
+	assert.Equal(t, int64(2), statistics.TopReferrers[0].Clicks)
+
+	unauthenticatedResponse := makeRequest(http.MethodGet, statisticsPath, nil)
+	assert.Equal(t, http.StatusUnauthorized, unauthenticatedResponse.Code)
+
+	_, err = registerUserHelper("analytics-other@example.com", "password123")
+	assert.NoError(t, err)
+	otherUser, err := loginUserHelper("analytics-other@example.com", "password123")
+	assert.NoError(t, err)
+	otherUserResponse := makeAuthenticatedRequest(http.MethodGet, statisticsPath, nil, otherUser.Tokens.AccessToken)
+	assert.Equal(t, http.StatusNotFound, otherUserResponse.Code)
+	otherUserDetailsResponse := makeAuthenticatedRequest(http.MethodGet, "/api/v1/urls/"+storedURL.ID.String(), nil, otherUser.Tokens.AccessToken)
+	assert.Equal(t, http.StatusNotFound, otherUserDetailsResponse.Code)
+	otherUserDeleteResponse := makeAuthenticatedRequest(http.MethodDelete, "/api/v1/urls/"+storedURL.ID.String(), nil, otherUser.Tokens.AccessToken)
+	assert.Equal(t, http.StatusNotFound, otherUserDeleteResponse.Code)
+	otherUserUpdateResponse := makeAuthenticatedRequest(
+		http.MethodPatch,
+		"/api/v1/urls/"+storedURL.ID.String(),
+		dtos.UpdateURLRequest{OriginalURL: "https://forbidden.example"},
+		otherUser.Tokens.AccessToken,
+	)
+	assert.Equal(t, http.StatusNotFound, otherUserUpdateResponse.Code)
+
+	deleteResponse := makeAuthenticatedRequest(http.MethodDelete, "/api/v1/urls/"+storedURL.ID.String(), nil, owner.Tokens.AccessToken)
+	assert.Equal(t, http.StatusNoContent, deleteResponse.Code)
+
+	var remainingStatistics int64
+	assert.NoError(t, testDB.Model(&domain.URLStatistics{}).Where("url_id = ?", storedURL.ID).Count(&remainingStatistics).Error)
+	assert.Zero(t, remainingStatistics)
 }
 
 func Test_DeleteByIDEndpoint(t *testing.T) {
@@ -1012,6 +1099,91 @@ func Test_SearchByOriginalURLEndpoint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_GetAllURLsEndpoint(t *testing.T) {
+	cleanupDatabase(t)
+
+	_, err := registerUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	loginResp, err := loginUserHelper("test@example.com", "password123")
+	assert.NoError(t, err)
+
+	urls := []domain.URL{}
+	// Create multiple shortened URLs for the authenticated user
+	for i := range 5 {
+		originalURL := fmt.Sprintf("https://www.example.com/page%d", i)
+		urlResp, err := createShortenURLHelper(originalURL, loginResp.Tokens.AccessToken)
+		assert.NoError(t, err)
+		urls = append(urls, domain.URL{
+			ID:          urlResp.ID,
+			OriginalURL: urlResp.OriginalURL,
+			ShortCode:   urlResp.ShortCode,
+			UserID:      urlResp.UserID,
+		})
+	}
+
+	tests := []struct {
+		name           string
+		method         string
+		url            string
+		accessToken    string
+		expectedStatus int
+		assertions     func(t *testing.T, w *httptest.ResponseRecorder)
+	}{
+		{
+			name:           "Get all URLs for authenticated user",
+			method:         "GET",
+			url:            "/api/v1/urls",
+			accessToken:    loginResp.Tokens.AccessToken,
+			expectedStatus: http.StatusOK,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp []domain.URL
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.GreaterOrEqual(t, len(resp), 1)
+				found := false
+				for _, url := range resp {
+					for _, u := range urls {
+						if url.ID == u.ID {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("URL with ID %s not found in response", url.ID)
+					}
+				}
+			},
+		},
+		{
+			name:           "Unauthorized access to get all URLs",
+			method:         "GET",
+			url:            "/api/v1/urls",
+			accessToken:    "",
+			expectedStatus: http.StatusUnauthorized,
+			assertions: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var resp dtos.ErrorResponse
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
+				assert.NoError(t, err)
+				assert.Equal(t, "authorization token required", resp.Error)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := makeAuthenticatedRequest(tt.method, tt.url, nil, tt.accessToken)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.assertions != nil {
+				tt.assertions(t, w)
+			}
+		})
+	}
+
 }
 
 func Test_BulkShortenURLs_Counter_Range_Rotation(t *testing.T) {

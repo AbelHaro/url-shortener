@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import { usePostAuthLogin } from "@/api/generated";
-import { AccountMenu } from "@/components/account-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,9 +48,7 @@ export function Login() {
       },
       {
         onSuccess: (response) => {
-          if (response.status !== 200) return;
-
-          const { user } = response.data;
+          const { user } = response;
           if (!user?.name) return;
 
           toast.success(`Welcome back, ${user.name}`);
@@ -64,7 +61,6 @@ export function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <AccountMenu />
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Login</CardTitle>

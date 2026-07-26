@@ -1,6 +1,6 @@
-import { defineConfig, defineTransformer } from "orval";
+import { defineConfig } from "orval";
 
-const renameDtos = defineTransformer((input) => {
+const renameDtos = (input: Record<string, any>) => {
   const schemaPrefix = "DtosV1";
 
   const schemaEntries = Object.entries(input.components?.schemas ?? {});
@@ -59,7 +59,7 @@ const renameDtos = defineTransformer((input) => {
       schemas,
     },
   };
-});
+};
 
 export default defineConfig({
   petstore: {

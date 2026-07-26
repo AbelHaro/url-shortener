@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import { usePostAuthAnonymousRegister, usePostAuthRegister } from "@/api/generated";
-import { AccountMenu } from "@/components/account-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -61,16 +60,7 @@ export function Register() {
       },
       {
         onSuccess: (response) => {
-          if (response.status === 409) {
-            const errorMessage = "Email already in use";
-            toast.error(errorMessage);
-            setMessage(errorMessage);
-            return;
-          }
-
-          if (response.status !== 201) return;
-
-          const { user } = response.data;
+          const { user } = response;
           if (!user?.name) return;
 
           toast.success(`Account created for ${user.name}`);
@@ -86,9 +76,7 @@ export function Register() {
 
     anonymousMutation.mutate(undefined, {
         onSuccess: (response) => {
-          if (response.status !== 201) return;
-
-          const { user } = response.data;
+          const { user } = response;
           if (!user?.name) return;
 
           toast.success(`Anonymous account created for ${user.name}`);
@@ -100,7 +88,6 @@ export function Register() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <AccountMenu />
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Create account</CardTitle>

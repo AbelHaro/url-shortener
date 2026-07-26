@@ -1,40 +1,19 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
 import { usePostShortenURL } from "@/api/generated";
-import { AccountMenu } from "@/components/account-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useSession } from "@/lib/session";
 
 const baseURL = window.location.origin;
 
 export function Short() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<string | null>(null);
-  const { loading: checkingSession, authenticated: isAuthenticated } = useSession();
 
   const shortener = usePostShortenURL({
     request: { credentials: "include" },
   });
-
-  if (checkingSession) {
-    return (
-      <div className="flex items-center justify-center min-h-screen p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Checking session...</CardTitle>
-            <CardDescription>Please wait while we verify your login.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
 
   const { mutate, isPending, isError, error } = shortener;
 
@@ -49,9 +28,7 @@ export function Short() {
       },
       {
         onSuccess: (response) => {
-          if (response.status === 201) {
-            setResult(`${baseURL}/${response.data.short_code}`);
-          }
+          setResult(`${baseURL}/${response.short_code}`);
         },
         onError: (err) => {
           console.error("Error shortening URL:", err);
@@ -63,7 +40,6 @@ export function Short() {
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4">
-      <AccountMenu />
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Shorten URL</CardTitle>

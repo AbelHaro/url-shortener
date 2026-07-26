@@ -5,8 +5,7 @@
  * API for shortening URLs
  * OpenAPI spec version: 1.0
  */
-import type { DtosUserResponse } from './dtosUserResponse';
 
-export interface DtosSessionResponse {
-  user?: DtosUserResponse;
+export interface DtosResolveShortURLRequest {
+  referrer?: string;
 }

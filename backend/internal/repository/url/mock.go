@@ -1,6 +1,8 @@
 package url
 
 import (
+	"context"
+
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
 	"github.com/google/uuid"
 )
@@ -16,11 +18,6 @@ func NewMockRepository() Repository {
 }
 
 func (m *MockRepository) Store(url *domain.URL) (*domain.URL, error) {
-	for _, existing := range m.urls {
-		if existing.OriginalURL == url.OriginalURL {
-			return existing, nil
-		}
-	}
 	if url.ID == uuid.Nil {
 		url.ID = uuid.New()
 	}
@@ -35,6 +32,15 @@ func (m *MockRepository) FindByOriginalURL(originalURL string) (*domain.URL, err
 	}
 	return nil, nil
 }
+func (m *MockRepository) UpdateOriginalURL(_ context.Context, id, userID uuid.UUID, originalURL string) (*domain.URL, error) {
+	for _, storedURL := range m.urls {
+		if storedURL.ID == id && storedURL.UserID == userID {
+			storedURL.OriginalURL = originalURL
+			return storedURL, nil
+		}
+	}
+	return nil, domain.ErrURLNotFound
+}
 func (m *MockRepository) FindByShortCode(shortCode string) (*domain.URL, error) {
 	if url, ok := m.urls[shortCode]; ok {
 		return url, nil
@@ -45,6 +51,14 @@ func (m *MockRepository) FindByID(id uuid.UUID) (*domain.URL, error) {
 	for _, url := range m.urls {
 		if url.ID == id {
 			return url, nil
+		}
+	}
+	return nil, nil
+}
+func (m *MockRepository) FindByIDAndUserID(_ context.Context, id, userID uuid.UUID) (*domain.URL, error) {
+	for _, storedURL := range m.urls {
+		if storedURL.ID == id && storedURL.UserID == userID {
+			return storedURL, nil
 		}
 	}
 	return nil, nil
@@ -74,4 +88,23 @@ func (m *MockRepository) DeleteByID(id uuid.UUID) error {
 		}
 	}
 	return domain.ErrURLNotFound
+}
+func (m *MockRepository) DeleteByIDAndUserID(_ context.Context, id, userID uuid.UUID) error {
+	for _, storedURL := range m.urls {
+		if storedURL.ID == id && storedURL.UserID == userID {
+			delete(m.urls, storedURL.ShortCode)
+			return nil
+		}
+	}
+	return domain.ErrURLNotFound
+}
+
+func (m *MockRepository) FindAllByUserID(userID uuid.UUID) ([]domain.URL, error) {
+	var urls []domain.URL
+	for _, url := range m.urls {
+		if url.UserID == userID {
+			urls = append(urls, *url)
+		}
+	}
+	return urls, nil
 }

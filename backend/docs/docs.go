@@ -303,6 +303,36 @@ const docTemplate = `{
                 }
             }
         },
+        "/urls": {
+            "get": {
+                "description": "Retrieve all shortened URLs created by a specific user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "URLs"
+                ],
+                "summary": "Get all URLs by user ID",
+                "operationId": "getURLsByUserID",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/domain.URL"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/urls/search": {
             "post": {
                 "description": "Find a shortened URL by its original URL",
@@ -380,6 +410,59 @@ const docTemplate = `{
                 }
             }
         },
+        "/urls/short/{shortCode}/resolve": {
+            "post": {
+                "description": "Resolve a short code and record one click",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "URLs"
+                ],
+                "summary": "Resolve a short URL",
+                "operationId": "resolveShortURL",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Short Code",
+                        "name": "shortCode",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Resolution context",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ResolveShortURLRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ResolveShortURLResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/urls/{id}": {
             "get": {
                 "description": "Retrieve a URL by its ID",
@@ -434,6 +517,112 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "description": "Change the original URL while preserving the short code",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "URLs"
+                ],
+                "summary": "Update URL destination",
+                "operationId": "updateURLByID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "URL ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New destination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dtos.UpdateURLRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.URLResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/urls/{id}/statistics": {
+            "get": {
+                "description": "Retrieve owner-only click analytics for a shortened URL",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "URLs"
+                ],
+                "summary": "Get URL statistics",
+                "operationId": "getURLStatistics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "URL ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.URLStatisticsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorResponse"
+                        }
                     },
                     "404": {
                         "description": "Not Found",
@@ -515,6 +704,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dtos.DailyClickResponse": {
+            "type": "object",
+            "required": [
+                "date"
+            ],
+            "properties": {
+                "clicks": {
+                    "type": "integer"
+                },
+                "date": {
+                    "type": "string"
+                }
+            }
+        },
         "dtos.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -536,6 +739,35 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "minLength": 8
+                }
+            }
+        },
+        "dtos.RecentClickResponse": {
+            "type": "object",
+            "required": [
+                "clicked_at",
+                "referrer"
+            ],
+            "properties": {
+                "clicked_at": {
+                    "type": "string"
+                },
+                "referrer": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtos.ReferrerCountResponse": {
+            "type": "object",
+            "required": [
+                "referrer"
+            ],
+            "properties": {
+                "clicks": {
+                    "type": "integer"
+                },
+                "referrer": {
+                    "type": "string"
                 }
             }
         },
@@ -563,6 +795,25 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "minLength": 8
+                }
+            }
+        },
+        "dtos.ResolveShortURLRequest": {
+            "type": "object",
+            "properties": {
+                "referrer": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtos.ResolveShortURLResponse": {
+            "type": "object",
+            "required": [
+                "original_url"
+            ],
+            "properties": {
+                "original_url": {
+                    "type": "string"
                 }
             }
         },
@@ -623,6 +874,55 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtos.URLStatisticsResponse": {
+            "type": "object",
+            "required": [
+                "clicks_by_day",
+                "recent_clicks",
+                "top_referrers",
+                "url"
+            ],
+            "properties": {
+                "clicks_by_day": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtos.DailyClickResponse"
+                    }
+                },
+                "last_clicked_at": {
+                    "type": "string"
+                },
+                "recent_clicks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtos.RecentClickResponse"
+                    }
+                },
+                "top_referrers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dtos.ReferrerCountResponse"
+                    }
+                },
+                "total_clicks": {
+                    "type": "integer"
+                },
+                "url": {
+                    "$ref": "#/definitions/dtos.URLResponse"
+                }
+            }
+        },
+        "dtos.UpdateURLRequest": {
+            "type": "object",
+            "required": [
+                "original_url"
+            ],
+            "properties": {
+                "original_url": {
                     "type": "string"
                 }
             }

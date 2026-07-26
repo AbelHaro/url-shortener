@@ -6,6 +6,7 @@ var (
 	ErrURLNotFound = errors.New("url not found")
 	ErrURLExists   = errors.New("url already exists")
 	ErrInvalidURL  = errors.New("invalid url")
+	ErrInvalidID   = errors.New("invalid id")
 	ErrInternal    = errors.New("internal error")
 
 	ErrUserNotFound       = errors.New("user not found")

@@ -27,7 +27,7 @@ func NewDB(cfg *config.AppConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	if err := db.AutoMigrate(entities...); err != nil {
+	if err := migrate(db); err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}
 
@@ -45,9 +45,21 @@ func NewDBFromDSN(dsn string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	if err := db.AutoMigrate(entities...); err != nil {
+	if err := migrate(db); err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}
 
 	return db, nil
+}
+
+func migrate(db *gorm.DB) error {
+	if db.Migrator().HasIndex(&domain.URL{}, "idx_urls_original_url") {
+		if err := db.Migrator().DropIndex(&domain.URL{}, "idx_urls_original_url"); err != nil {
+			return fmt.Errorf("drop original URL uniqueness: %w", err)
+		}
+	}
+	if err := db.AutoMigrate(entities...); err != nil {
+		return fmt.Errorf("auto migrate entities: %w", err)
+	}
+	return nil
 }

@@ -192,7 +192,7 @@ func TestHandler_FindByID(t *testing.T) {
 		{
 			name:       "invalid id",
 			id:         "invalid",
-			wantStatus: http.StatusInternalServerError,
+			wantStatus: http.StatusBadRequest,
 		},
 	}
 
@@ -260,6 +260,62 @@ func TestHandler_DeleteByID(t *testing.T) {
 
 			if w.Code != tt.wantStatus {
 				t.Errorf("DeleteByID() status = %v, want %v", w.Code, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func TestHandler_UpdateByID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler, err := provideHandler()
+	if err != nil {
+		t.Fatalf("provideHandler() error = %v", err)
+	}
+	jwtMiddleware := provideJWTMiddleware()
+	ownerID := uuid.New()
+	storedURL, err := handler.Service.Store("https://before.example", ownerID)
+	if err != nil {
+		t.Fatalf("Service.Store() error = %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		userID      uuid.UUID
+		originalURL string
+		wantStatus  int
+	}{
+		{name: "owner updates destination", userID: ownerID, originalURL: "https://after.example", wantStatus: http.StatusOK},
+		{name: "invalid destination", userID: ownerID, originalURL: "not-a-url", wantStatus: http.StatusBadRequest},
+		{name: "different user sees not found", userID: uuid.New(), originalURL: "https://forbidden.example", wantStatus: http.StatusNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			router.PATCH(apiRoute+"/urls/:id", jwtMiddleware.Authenticate(), handler.UpdateByID)
+
+			body, marshalErr := json.Marshal(dtos.UpdateURLRequest{OriginalURL: tt.originalURL})
+			if marshalErr != nil {
+				t.Fatalf("json.Marshal() error = %v", marshalErr)
+			}
+			request := httptest.NewRequest(http.MethodPatch, apiRoute+"/urls/"+storedURL.ID.String(), bytes.NewReader(body))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Authorization", "Bearer "+generateTestToken(tt.userID))
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+
+			if response.Code != tt.wantStatus {
+				t.Errorf("UpdateByID() status = %d, want %d; body = %s", response.Code, tt.wantStatus, response.Body)
+			}
+			if tt.wantStatus == http.StatusOK {
+				var updated dtos.URLResponse
+				if err := json.Unmarshal(response.Body.Bytes(), &updated); err != nil {
+					t.Fatalf("json.Unmarshal() error = %v", err)
+				}
+				if updated.ShortCode != storedURL.ShortCode {
+					t.Errorf("ShortCode = %q, want %q", updated.ShortCode, storedURL.ShortCode)
+				}
 			}
 		})
 	}

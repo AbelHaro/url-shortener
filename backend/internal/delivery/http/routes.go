@@ -9,14 +9,17 @@ import (
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/auth"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/health"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/middleware"
+	statisticHandler "github.com/AbelHaro/url-shortener/backend/internal/delivery/http/statistic"
 	"github.com/AbelHaro/url-shortener/backend/internal/delivery/http/url"
 	authRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/auth"
 	idrangesRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/idsranges"
+	statisticRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/statistic"
 	urlRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/url"
 	authSvc "github.com/AbelHaro/url-shortener/backend/internal/service/auth"
 	counterSvc "github.com/AbelHaro/url-shortener/backend/internal/service/counter"
 	idrangesSvc "github.com/AbelHaro/url-shortener/backend/internal/service/idsranges"
 	jwtSvc "github.com/AbelHaro/url-shortener/backend/internal/service/jwt"
+	statisticSvc "github.com/AbelHaro/url-shortener/backend/internal/service/statistic"
 	urlSvc "github.com/AbelHaro/url-shortener/backend/internal/service/url"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -25,7 +28,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.Handler, authHandler *auth.Handler, authService *authSvc.Service, appConfig *config.AppConfig) *gin.Engine {
+func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, statisticsHandler *statisticHandler.Handler, healthHandler *health.Handler, authHandler *auth.Handler, authService *authSvc.Service, appConfig *config.AppConfig) *gin.Engine {
 	docs.SwaggerInfo.Title = "URL Shortener API"
 	docs.SwaggerInfo.Description = "API for shortening and managing URLs"
 	docs.SwaggerInfo.Version = "1.0"
@@ -41,7 +44,7 @@ func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.H
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173", "https://url-shortener.abelharo.me"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
@@ -78,12 +81,16 @@ func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, healthHandler *health.H
 
 		urls := api.Group("")
 		urls.GET("/urls/short/:shortCode", urlHandler.FindByShortCode)
+		urls.POST("/urls/short/:shortCode/resolve", statisticsHandler.Resolve)
 		urls.Use(jwtMiddleware.Authenticate())
 		{
 			urls.POST("/shorten", urlHandler.Create)
 			urls.GET("/urls/:id", urlHandler.FindByID)
+			urls.GET("/urls/:id/statistics", statisticsHandler.GetDashboard)
+			urls.PATCH("/urls/:id", urlHandler.UpdateByID)
 			urls.DELETE("/urls/:id", urlHandler.DeleteByID)
 			urls.POST("/urls/search", urlHandler.FindByOriginalURL)
+			urls.GET("/urls", urlHandler.FindByAllByUserID)
 		}
 	}
 
@@ -100,6 +107,7 @@ func NewConfiguredRouter(db *gorm.DB, appConfig *config.AppConfig) (*gin.Engine,
 	urlRepoInstance := urlRepo.NewPostgresRepository(db)
 	authRepoInstance := authRepo.NewPostgresRepository(db)
 	idrangesRepoInstance := idrangesRepo.NewPostgresRepository(db)
+	statisticRepoInstance := statisticRepo.NewPostgresRepository(db)
 
 	// Initialize services
 	idrangesSvcInstance := idrangesSvc.NewService(idrangesRepoInstance)
@@ -110,16 +118,18 @@ func NewConfiguredRouter(db *gorm.DB, appConfig *config.AppConfig) (*gin.Engine,
 	}
 
 	urlService := urlSvc.NewService(urlRepoInstance, counterService)
+	statisticService := statisticSvc.NewService(statisticRepoInstance)
 	jwtService := jwtSvc.NewService(appConfig.JWTSecret, appConfig.AccessTTL, appConfig.RefreshTTL)
 	authService := authSvc.NewService(authRepoInstance, jwtService)
 
 	// Initialize handlers
 	urlHandler := url.NewHandler(urlService)
+	statisticsHandler := statisticHandler.NewHandler(statisticService, urlService)
 	healthHandler := health.NewHandler()
 	authHandler := auth.NewHandler(authService, appConfig.Production)
 
 	// Setup routes (all middlewares are created inside SetupRoutes)
-	SetupRoutes(router, urlHandler, healthHandler, authHandler, authService, appConfig)
+	SetupRoutes(router, urlHandler, statisticsHandler, healthHandler, authHandler, authService, appConfig)
 
 	return router, nil
 }

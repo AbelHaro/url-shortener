@@ -1,54 +1,54 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useGetURLByShortCode } from "@/api/generated";
+import { resolveShortURL } from "@/api/generated";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function Redirect() {
   const { shortCode } = useParams<{ shortCode: string }>();
-  const { data, isLoading, isError } = useGetURLByShortCode(shortCode!, {
-    query: {
-    enabled: !!shortCode,
-  }
-});
-
+  const attempted = useRef(false);
+  const [isError, setIsError] = useState(false);
 
   useEffect(() => {
-    if (data?.status === 200 && data.data.original_url) {
-      window.location.href = data.data.original_url;
+    if (!shortCode || attempted.current) {
+      return;
     }
-  }, [data]);
+    attempted.current = true;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Redirecting...</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Please wait while we redirect you.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+    void resolveShortURL(shortCode, { referrer: document.referrer })
+      .then((response) => {
+        window.location.replace(response.original_url);
+      })
+      .catch(() => {
+        setIsError(true);
+      });
+  }, [shortCode]);
 
-  if (isError) {
+  if (isError || !shortCode) {
     return (
-      <div className="flex items-center justify-center min-h-screen p-4">
+      <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>URL Not Found</CardTitle>
-            <CardDescription>
-              The short URL you are trying to access does not exist.
-            </CardDescription>
+            <CardDescription>The short URL you are trying to access does not exist.</CardDescription>
           </CardHeader>
         </Card>
       </div>
     );
   }
 
-  return null;
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Redirecting...</CardTitle>
+          <CardDescription>Resolving your destination.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">You will be redirected automatically.</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 export default Redirect;

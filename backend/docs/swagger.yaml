@@ -29,6 +29,15 @@ definitions:
     required:
     - original_url
     type: object
+  dtos.DailyClickResponse:
+    properties:
+      clicks:
+        type: integer
+      date:
+        type: string
+    required:
+    - date
+    type: object
   dtos.ErrorResponse:
     properties:
       error:
@@ -44,6 +53,25 @@ definitions:
     required:
     - email
     - password
+    type: object
+  dtos.RecentClickResponse:
+    properties:
+      clicked_at:
+        type: string
+      referrer:
+        type: string
+    required:
+    - clicked_at
+    - referrer
+    type: object
+  dtos.ReferrerCountResponse:
+    properties:
+      clicks:
+        type: integer
+      referrer:
+        type: string
+    required:
+    - referrer
     type: object
   dtos.RefreshTokenRequest:
     properties:
@@ -62,6 +90,18 @@ definitions:
     required:
     - email
     - password
+    type: object
+  dtos.ResolveShortURLRequest:
+    properties:
+      referrer:
+        type: string
+    type: object
+  dtos.ResolveShortURLResponse:
+    properties:
+      original_url:
+        type: string
+    required:
+    - original_url
     type: object
   dtos.SearchByOriginalURLRequest:
     properties:
@@ -103,6 +143,39 @@ definitions:
     - short_code
     - updated_at
     - user_id
+    type: object
+  dtos.URLStatisticsResponse:
+    properties:
+      clicks_by_day:
+        items:
+          $ref: '#/definitions/dtos.DailyClickResponse'
+        type: array
+      last_clicked_at:
+        type: string
+      recent_clicks:
+        items:
+          $ref: '#/definitions/dtos.RecentClickResponse'
+        type: array
+      top_referrers:
+        items:
+          $ref: '#/definitions/dtos.ReferrerCountResponse'
+        type: array
+      total_clicks:
+        type: integer
+      url:
+        $ref: '#/definitions/dtos.URLResponse'
+    required:
+    - clicks_by_day
+    - recent_clicks
+    - top_referrers
+    - url
+    type: object
+  dtos.UpdateURLRequest:
+    properties:
+      original_url:
+        type: string
+    required:
+    - original_url
     type: object
   dtos.UserResponse:
     properties:
@@ -330,6 +403,26 @@ paths:
       summary: Shorten a URL
       tags:
       - URLs
+  /urls:
+    get:
+      description: Retrieve all shortened URLs created by a specific user
+      operationId: getURLsByUserID
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.URL'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+      summary: Get all URLs by user ID
+      tags:
+      - URLs
   /urls/{id}:
     delete:
       description: Delete a URL by its ID
@@ -371,6 +464,77 @@ paths:
           schema:
             $ref: '#/definitions/dtos.ErrorResponse'
       summary: Get URL by ID
+      tags:
+      - URLs
+    patch:
+      consumes:
+      - application/json
+      description: Change the original URL while preserving the short code
+      operationId: updateURLByID
+      parameters:
+      - description: URL ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New destination
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.UpdateURLRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.URLResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+      summary: Update URL destination
+      tags:
+      - URLs
+  /urls/{id}/statistics:
+    get:
+      description: Retrieve owner-only click analytics for a shortened URL
+      operationId: getURLStatistics
+      parameters:
+      - description: URL ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.URLStatisticsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+      summary: Get URL statistics
       tags:
       - URLs
   /urls/search:
@@ -422,6 +586,41 @@ paths:
           schema:
             $ref: '#/definitions/dtos.ErrorResponse'
       summary: Get URL by short code
+      tags:
+      - URLs
+  /urls/short/{shortCode}/resolve:
+    post:
+      consumes:
+      - application/json
+      description: Resolve a short code and record one click
+      operationId: resolveShortURL
+      parameters:
+      - description: Short Code
+        in: path
+        name: shortCode
+        required: true
+        type: string
+      - description: Resolution context
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/dtos.ResolveShortURLRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.ResolveShortURLResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dtos.ErrorResponse'
+      summary: Resolve a short URL
       tags:
       - URLs
 securityDefinitions:

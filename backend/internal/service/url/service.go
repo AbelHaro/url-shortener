@@ -1,7 +1,9 @@
 package url
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/url"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
@@ -63,7 +65,7 @@ func (svc *Service) FindByShortCode(shortCode string) (*domain.URL, error) {
 func (svc *Service) FindByID(id string) (*domain.URL, error) {
 	parsedID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, domain.ErrInternal
+		return nil, fmt.Errorf("parse URL ID: %w", domain.ErrInvalidID)
 	}
 	urlFound, err := svc.repo.FindByID(parsedID)
 	if err != nil {
@@ -73,6 +75,41 @@ func (svc *Service) FindByID(id string) (*domain.URL, error) {
 		return nil, domain.ErrURLNotFound
 	}
 	return urlFound, nil
+}
+
+// FindByIDForUser returns a URL only when it belongs to the supplied user.
+func (svc *Service) FindByIDForUser(ctx context.Context, id string, userID uuid.UUID) (*domain.URL, error) {
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("parse URL ID: %w", domain.ErrInvalidID)
+	}
+	urlFound, err := svc.repo.FindByIDAndUserID(ctx, parsedID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("find URL for user: %w", err)
+	}
+	if urlFound == nil {
+		return nil, domain.ErrURLNotFound
+	}
+	return urlFound, nil
+}
+
+// UpdateOriginalURLForUser changes a URL destination without changing its short code.
+func (svc *Service) UpdateOriginalURLForUser(ctx context.Context, id string, userID uuid.UUID, originalURL string) (*domain.URL, error) {
+	if err := svc.ValidateURL(originalURL); err != nil {
+		return nil, err
+	}
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("parse URL ID: %w", domain.ErrInvalidID)
+	}
+	updatedURL, err := svc.repo.UpdateOriginalURL(ctx, parsedID, userID, originalURL)
+	if err != nil {
+		if errors.Is(err, domain.ErrURLNotFound) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("update URL for user: %w", domain.ErrInternal)
+	}
+	return updatedURL, nil
 }
 
 func (svc *Service) FindByOriginalURL(originalURL string) (*domain.URL, error) {
@@ -89,7 +126,7 @@ func (svc *Service) FindByOriginalURL(originalURL string) (*domain.URL, error) {
 func (svc *Service) DeleteByID(id string) error {
 	parsedID, err := uuid.Parse(id)
 	if err != nil {
-		return domain.ErrInternal
+		return fmt.Errorf("parse URL ID: %w", domain.ErrInvalidID)
 	}
 	_, err = svc.repo.FindByID(parsedID)
 	if err != nil {
@@ -102,6 +139,21 @@ func (svc *Service) DeleteByID(id string) error {
 	}
 	if err != nil {
 		return domain.ErrInternal
+	}
+	return nil
+}
+
+// DeleteByIDForUser deletes a URL only when it belongs to the supplied user.
+func (svc *Service) DeleteByIDForUser(ctx context.Context, id string, userID uuid.UUID) error {
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return fmt.Errorf("parse URL ID: %w", domain.ErrInvalidID)
+	}
+	if err := svc.repo.DeleteByIDAndUserID(ctx, parsedID, userID); err != nil {
+		if errors.Is(err, domain.ErrURLNotFound) {
+			return err
+		}
+		return fmt.Errorf("delete URL for user: %w", domain.ErrInternal)
 	}
 	return nil
 }
@@ -138,6 +190,14 @@ func (svc *Service) ValidateURL(rawURL string) error {
 		return domain.ErrInvalidURL
 	}
 	return nil
+}
+
+func (svc *Service) FindAllByUserID(userID uuid.UUID) ([]domain.URL, error) {
+	urlsFound, err := svc.repo.FindAllByUserID(userID)
+	if err != nil {
+		return nil, domain.ErrInternal
+	}
+	return urlsFound, nil
 }
 
 // func (svc *Service) GenerateDevData() error {

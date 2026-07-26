@@ -12,6 +12,12 @@ type CreateShortenRequest struct {
 	OriginalUrl string `json:"original_url" binding:"required"`
 }
 
+// UpdateURLRequest is the request to change a shortened URL destination.
+// @name UpdateURLRequest
+type UpdateURLRequest struct {
+	OriginalURL string `json:"original_url" binding:"required"`
+}
+
 // URLResponse is the response containing URL details
 // @name URLResponse
 type URLResponse struct {

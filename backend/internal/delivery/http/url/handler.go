@@ -112,7 +112,12 @@ func (h *Handler) Redirect(c *gin.Context) {
 func (h *Handler) FindByID(c *gin.Context) {
 	id := c.Param("id")
 
-	urlFound, err := h.Service.FindByID(id)
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	urlFound, err := h.Service.FindByIDForUser(c.Request.Context(), id, userID)
 	if err != nil {
 		h.handleError(c, err)
 		return
@@ -143,6 +148,53 @@ func (h *Handler) FindByShortCode(c *gin.Context) {
 	c.JSON(http.StatusOK, urlFound)
 }
 
+// UpdateByID changes the destination of a URL owned by the current user.
+// @Summary Update URL destination
+// @Description Change the original URL while preserving the short code
+// @Tags URLs
+// @Accept json
+// @Produce json
+// @Param id path string true "URL ID"
+// @Param request body dtos.UpdateURLRequest true "New destination"
+// @Success 200 {object} dtos.URLResponse
+// @Failure 400 {object} dtos.ErrorResponse
+// @Failure 401 {object} dtos.ErrorResponse
+// @Failure 404 {object} dtos.ErrorResponse
+// @Router /urls/{id} [patch]
+// @ID updateURLByID
+func (h *Handler) UpdateByID(c *gin.Context) {
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	var request dtos.UpdateURLRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: "invalid request body"})
+		return
+	}
+
+	updatedURL, err := h.Service.UpdateOriginalURLForUser(
+		c.Request.Context(),
+		c.Param("id"),
+		userID,
+		request.OriginalURL,
+	)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, dtos.URLResponse{
+		ID:          updatedURL.ID,
+		OriginalURL: updatedURL.OriginalURL,
+		ShortCode:   updatedURL.ShortCode,
+		UserID:      updatedURL.UserID,
+		CreatedAt:   updatedURL.CreatedAt,
+		UpdatedAt:   updatedURL.UpdatedAt,
+	})
+}
+
 // DeleteByID Delete URL by ID
 // @Summary Delete URL
 // @Description Delete a URL by its ID
@@ -155,7 +207,12 @@ func (h *Handler) FindByShortCode(c *gin.Context) {
 func (h *Handler) DeleteByID(c *gin.Context) {
 	id := c.Param("id")
 
-	err := h.Service.DeleteByID(id)
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	err := h.Service.DeleteByIDForUser(c.Request.Context(), id, userID)
 	if err != nil {
 		h.handleError(c, err)
 		return
@@ -197,13 +254,62 @@ func (h *Handler) FindByOriginalURL(c *gin.Context) {
 	c.JSON(http.StatusOK, urlFound)
 }
 
+// FindByAllByUserID Find all URLs by user ID
+// @Summary Get all URLs by user ID
+// @Description Retrieve all shortened URLs created by a specific user
+// @Tags URLs
+// @Produce json
+// @Success 200 {array} domain.URL
+// @Failure 401 {object} dtos.ErrorResponse
+// @Router /urls [get]
+// @ID getURLsByUserID
+func (h *Handler) FindByAllByUserID(c *gin.Context) {
+	userIDRaw, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "user not authenticated"})
+		return
+	}
+
+	userID := uuid.MustParse(fmt.Sprintf("%v", userIDRaw))
+
+	if userID == uuid.Nil {
+		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "invalid user ID"})
+		return
+	}
+
+	urlsFound, err := h.Service.FindAllByUserID(userID)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, urlsFound)
+}
+
 func (h *Handler) handleError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrURLNotFound):
 		c.JSON(http.StatusNotFound, dtos.ErrorResponse{Error: err.Error()})
 	case errors.Is(err, domain.ErrInvalidURL):
 		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: err.Error()})
+	case errors.Is(err, domain.ErrInvalidID):
+		c.JSON(http.StatusBadRequest, dtos.ErrorResponse{Error: err.Error()})
 	default:
 		c.JSON(http.StatusInternalServerError, dtos.ErrorResponse{Error: "internal server error"})
 	}
+}
+
+func authenticatedUserID(c *gin.Context) (uuid.UUID, bool) {
+	rawUserID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "user not authenticated"})
+		return uuid.Nil, false
+	}
+
+	userID, err := uuid.Parse(fmt.Sprintf("%v", rawUserID))
+	if err != nil || userID == uuid.Nil {
+		c.JSON(http.StatusUnauthorized, dtos.ErrorResponse{Error: "invalid user ID"})
+		return uuid.Nil, false
+	}
+	return userID, true
 }
