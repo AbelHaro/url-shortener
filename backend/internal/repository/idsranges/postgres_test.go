@@ -23,7 +23,8 @@ func TestPostgresRepository_UsesNumericRangeOrder(t *testing.T) {
 				"POSTGRES_PASSWORD": "password",
 				"POSTGRES_DB":       "url_shortener_test",
 			},
-			WaitingFor: wait.ForListeningPort("5432/tcp"),
+			WaitingFor: wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2),
 		},
 		Started: true,
 	})

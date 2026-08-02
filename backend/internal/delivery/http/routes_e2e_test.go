@@ -69,7 +69,8 @@ func TestMain(m *testing.M) {
 				"POSTGRES_PASSWORD": appConfig.DBConfig.Password,
 				"POSTGRES_DB":       appConfig.DBConfig.DBName,
 			},
-			WaitingFor: wait.ForListeningPort("5432/tcp"),
+			WaitingFor: wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2),
 		},
 		Started: true,
 	})
