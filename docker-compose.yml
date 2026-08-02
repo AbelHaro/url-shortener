@@ -45,7 +45,7 @@ services:
       JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-15m}
       JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL:-168h}
       # The bundled PostgreSQL service does not expose TLS.
-      PRODUCTION: true
+      PRODUCTION: ${PRODUCTION:-false}
       GIN_MODE: release
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-0.0.0.0/0}
     expose:

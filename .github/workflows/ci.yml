@@ -155,3 +155,34 @@ jobs:
           cache-to: type=gha,mode=max,scope=frontend
           build-args: |
             VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
+
+  deploy:
+    name: Deploy to Coolify
+    runs-on: ubuntu-latest
+    needs: [backend-build, frontend-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Trigger Coolify deployment
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_DEPLOY_URL: ${{ secrets.COOLIFY_DEPLOY_URL }}
+        run: |
+          if [ -z "${COOLIFY_API_TOKEN}" ]; then
+            echo "COOLIFY_API_TOKEN repository secret is not configured"
+            exit 1
+          fi
+
+          if [ -z "${COOLIFY_DEPLOY_URL}" ]; then
+            echo "COOLIFY_DEPLOY_URL repository secret is not configured"
+            exit 1
+          fi
+
+          curl \
+            --fail-with-body \
+            --silent \
+            --show-error \
+            --request POST \
+            --header "Accept: application/json" \
+            --header "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            "${COOLIFY_DEPLOY_URL}"
