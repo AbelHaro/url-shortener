@@ -182,7 +182,7 @@ jobs:
             --fail-with-body \
             --silent \
             --show-error \
-            --request POST \
+            --request GET \
             --header "Accept: application/json" \
             --header "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
             "${COOLIFY_DEPLOY_URL}"
