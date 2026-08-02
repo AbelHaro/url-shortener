@@ -43,6 +43,53 @@ func TestService_GenerateShortHash(t *testing.T) {
 	}
 }
 
+func TestService_RestartUsesNextOffset(t *testing.T) {
+	tests := []struct {
+		name       string
+		starts     int
+		wantOffset uint64
+	}{
+		{name: "one restart", starts: 2, wantOffset: 200},
+		{name: "several restarts", starts: 5, wantOffset: 500},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repository := idsrangesRepository.NewMockRepository()
+			rangeService := idsrangesService.NewService(repository)
+			seenCodes := make(map[string]bool, tt.starts)
+			var rangeID string
+			var lastService *Service
+
+			for start := range tt.starts {
+				service, err := NewService(rangeService)
+				if err != nil {
+					t.Fatalf("NewService() start %d error = %v", start, err)
+				}
+				if start == 0 {
+					rangeID = service.IDsRange.ID.String()
+				} else if service.IDsRange.ID.String() != rangeID {
+					t.Fatalf("start %d allocated range %s, want %s", start, service.IDsRange.ID, rangeID)
+				}
+
+				shortCode, err := service.GenerateShortHash()
+				if err != nil {
+					t.Fatalf("GenerateShortHash() start %d error = %v", start, err)
+				}
+				if seenCodes[shortCode] {
+					t.Errorf("start %d generated duplicate short code %q", start, shortCode)
+				}
+				seenCodes[shortCode] = true
+				lastService = service
+			}
+
+			if lastService.IDsRange.CurrentOffset != tt.wantOffset {
+				t.Errorf("offset = %d, want %d", lastService.IDsRange.CurrentOffset, tt.wantOffset)
+			}
+		})
+	}
+}
+
 func TestFeistel_CollisionFree(t *testing.T) {
 	cipher := feistel.NewCipher("test-key", 12)
 	seen := make(map[uint64]bool)

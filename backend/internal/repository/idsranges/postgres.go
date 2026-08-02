@@ -37,7 +37,9 @@ func (p *PostgresRepository) AllocateNewRange() (*domain.IDsRange, error) {
 			return domain.ErrInternal
 		}
 
-		lastRange, err := gorm.G[domain.IDsRange](tx).Last(ctx)
+		// IDsRange uses a UUID primary key, so GORM's Last would order by UUID
+		// instead of by the numeric range and could allocate the same range again.
+		lastRange, err := gorm.G[domain.IDsRange](tx).Order("last DESC").First(ctx)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// This is the first range being allocated so the start is 0
 			rangeAllocated = &domain.IDsRange{
@@ -114,7 +116,12 @@ func (p *PostgresRepository) UpdateRangeOffset(rangeID uuid.UUID) error {
 func (p *PostgresRepository) GetActiveRange() (*domain.IDsRange, error) {
 	ctx := context.Background()
 
-	activeRange, err := gorm.G[domain.IDsRange](p.db).Order("start DESC").First(ctx)
+	// Prefer the furthest-consumed row when legacy duplicate ranges exist. This
+	// prevents a restart from selecting an unused duplicate of an old range.
+	activeRange, err := gorm.G[domain.IDsRange](p.db).
+		Order("start DESC").
+		Order("current_offset DESC").
+		First(ctx)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}

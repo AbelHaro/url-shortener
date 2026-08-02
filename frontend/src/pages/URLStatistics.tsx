@@ -5,13 +5,16 @@ import {
   ArrowSquareOutIcon,
   CalendarBlankIcon,
   ClockIcon,
+  CopyIcon,
   CursorClickIcon,
   LinkSimpleIcon,
   PencilSimpleIcon,
 } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { useGetURLStatistics, useUpdateURLByID } from "@/api/generated";
 import type { DtosDailyClickResponse } from "@/api/model";
 import { APIError } from "@/api/fetcher";
+import { QRCode } from "@/components/qr-code";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -140,6 +143,19 @@ export function URLStatistics() {
   const totalClicks = data.total_clicks ?? 0;
   const topReferrerMaximum = Math.max(1, ...data.top_referrers.map((item) => item.clicks ?? 0));
 
+  const handleCopyShortURL = async () => {
+    try {
+      await navigator.clipboard.writeText(shortURL);
+      toast.success("Short link copied", {
+        description: "The link is ready to paste and share.",
+      });
+    } catch {
+      toast.error("Could not copy the link", {
+        description: "Please copy it manually and try again.",
+      });
+    }
+  };
+
   const startEditingDestination = () => {
     setDestination(data.url.original_url);
     destinationUpdater.reset();
@@ -196,12 +212,45 @@ export function URLStatistics() {
         </div>
 
         <Card>
-          <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-2">
-              <LinkSimpleIcon className="shrink-0 text-primary" aria-hidden="true" />
-              <span className="truncate font-mono text-sm">{shortURL}</span>
+          <CardContent className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-5">
+            <div className="min-w-0 space-y-3">
+              <div>
+                <p className="text-sm font-medium">Short link</p>
+                <p className="text-xs text-muted-foreground">Copy it or scan the QR code to share.</p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex min-w-0 items-center gap-2 rounded-md border bg-background px-3 py-2">
+                  <LinkSimpleIcon className="shrink-0 text-primary" aria-hidden="true" />
+                  <a
+                    href={shortURL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-w-0 flex-1 truncate font-mono text-sm text-primary hover:underline"
+                    title={shortURL}
+                  >
+                    {shortURL}
+                  </a>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={handleCopyShortURL}
+                    aria-label="Copy short link"
+                  >
+                    <CopyIcon aria-hidden="true" />
+                  </Button>
+                </div>
+                <Badge variant="secondary">Created {formatTimestamp(data.url.created_at)}</Badge>
+              </div>
             </div>
-            <Badge variant="secondary">Created {formatTimestamp(data.url.created_at)}</Badge>
+            <div className="border-t pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5">
+              <QRCode
+                value={shortURL}
+                size={104}
+                fileName={`${data.url.short_code}-qr.png`}
+                className="gap-2 sm:w-36"
+              />
+            </div>
           </CardContent>
         </Card>
 
