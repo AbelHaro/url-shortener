@@ -9,11 +9,11 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /api ./cmd/api
+RUN CGO_ENABLED=1 GOOS=linux go build -tags=musl -o /api ./cmd/api
 
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates postgresql-client
+RUN apk --no-cache add ca-certificates libgcc postgresql-client
 
 WORKDIR /app
 
