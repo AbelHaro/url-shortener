@@ -36,7 +36,7 @@ func newTestHandler(t *testing.T, statisticsRepository statisticRepo.Repository)
 	if err != nil {
 		t.Fatalf("NewService(counter) error = %v", err)
 	}
-	urlService := urlSvc.NewService(urlRepo.NewMockRepository(), counterService)
+	urlService := urlSvc.NewService(urlRepo.NewMockRepository(), nil, counterService)
 	statisticsService := statisticSvc.NewService(statisticsRepository)
 	return NewHandler(statisticsService, urlService), urlService, statisticsService
 }

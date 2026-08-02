@@ -8,22 +8,27 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/config"
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
 	"github.com/AbelHaro/url-shortener/backend/internal/dtos"
+	cacheInfra "github.com/AbelHaro/url-shortener/backend/internal/infrastructure/cache"
 	"github.com/AbelHaro/url-shortener/backend/internal/infrastructure/database"
+	urlRepo "github.com/AbelHaro/url-shortener/backend/internal/repository/url"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	glide "github.com/valkey-io/valkey-glide/go/v2"
 	"gorm.io/gorm"
 )
 
 var testDB *gorm.DB
+var testCache *glide.Client
 var testRouter *gin.Engine
 var appConfig *config.AppConfig
 
@@ -33,7 +38,7 @@ func TestMain(m *testing.M) {
 	appConfig = &config.AppConfig{
 		DBConfig: config.DBConfig{
 			Host:     "localhost",
-			Port:     "5432",
+			Port:     5432,
 			User:     "user",
 			Password: "password",
 			DBName:   "url_shortener_test",
@@ -42,8 +47,13 @@ func TestMain(m *testing.M) {
 			RangeSize:   1000,
 			RangeOffset: 100,
 		},
+		CacheConfig: config.CacheConfig{
+			Host: "localhost",
+			Port: 6379,
+			TTL:  1 * time.Hour,
+		},
 		Host:       "localhost",
-		Port:       "8080",
+		Port:       8080,
 		JWTSecret:  "test-secret-key",
 		AccessTTL:  15 * time.Minute,
 		RefreshTTL: 168 * time.Hour,
@@ -51,7 +61,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Start PostgreSQL container
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+	dbContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:        "postgres:18",
 			ExposedPorts: []string{"5432/tcp"},
@@ -69,12 +79,12 @@ func TestMain(m *testing.M) {
 	}
 
 	// Get the database connection string from the container
-	host, err := container.Host(ctx)
+	host, err := dbContainer.Host(ctx)
 	if err != nil {
 		panic(fmt.Sprintf("Could not get container host: %s", err))
 	}
 
-	port, err := container.MappedPort(ctx, "5432/tcp")
+	port, err := dbContainer.MappedPort(ctx, "5432/tcp")
 	if err != nil {
 		panic(fmt.Sprintf("Could not get container port: %s", err))
 	}
@@ -93,16 +103,59 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("Could not connect to database: %s", dbErr))
 	}
 
+	cacheContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: testcontainers.ContainerRequest{
+			Image:        "valkey/valkey:9.1.1",
+			ExposedPorts: []string{"6379/tcp"},
+			WaitingFor:   wait.ForListeningPort("6379/tcp"),
+		},
+		Started: true,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("Could not start Valkey container: %s", err))
+	}
+
+	cacheHost, err := cacheContainer.Host(ctx)
+	if err != nil {
+		panic(fmt.Sprintf("Could not get Valkey container host: %s", err))
+	}
+	cachePort, err := cacheContainer.MappedPort(ctx, "6379/tcp")
+	if err != nil {
+		panic(fmt.Sprintf("Could not get Valkey container port: %s", err))
+	}
+	appConfig.CacheConfig.Host = cacheHost
+	appConfig.CacheConfig.Port, err = strconv.Atoi(cachePort.Port())
+	if err != nil {
+		panic(fmt.Sprintf("Could not parse Valkey container port: %s", err))
+	}
+
+	testCache, err = cacheInfra.NewClient(appConfig.CacheConfig)
+	if err != nil {
+		panic(fmt.Sprintf("Could not connect to Valkey: %s", err))
+	}
+	urlCache, err := urlRepo.NewValkeyCache(testCache, appConfig.CacheConfig.TTL)
+	if err != nil {
+		panic(fmt.Sprintf("Could not configure URL cache: %s", err))
+	}
+
 	// Initialize router with all configured dependencies
 	var routerErr error
-	testRouter, routerErr = NewConfiguredRouter(testDB, appConfig)
+	testRouter, routerErr = NewConfiguredRouter(testDB, urlCache, appConfig)
 	if routerErr != nil {
 		panic(fmt.Sprintf("Could not configure router: %s", routerErr))
 	}
 
 	code := m.Run()
 
-	container.Terminate(ctx)
+	testCache.Close()
+	if err := cacheContainer.Terminate(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Could not terminate Valkey container: %s\n", err)
+		code = 1
+	}
+	if err := dbContainer.Terminate(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Could not terminate PostgreSQL container: %s\n", err)
+		code = 1
+	}
 	os.Exit(code)
 }
 
@@ -114,11 +167,15 @@ func TestMain(m *testing.M) {
 // 2. Truncating ids_ranges but keeping the counter's in-memory state causes desynchronization
 // 3. This would lead to duplicate short codes when the counter regenerates the same ranges
 func cleanupDatabase(t *testing.T) {
+	t.Helper()
 	if err := testDB.Exec("TRUNCATE TABLE urls CASCADE").Error; err != nil {
 		t.Fatalf("failed to truncate urls table: %v", err)
 	}
 	if err := testDB.Exec("TRUNCATE TABLE users CASCADE").Error; err != nil {
 		t.Fatalf("failed to truncate users table: %v", err)
+	}
+	if _, err := testCache.FlushAll(context.Background()); err != nil {
+		t.Fatalf("failed to flush cache: %v", err)
 	}
 	// NOTE: ids_ranges is NOT truncated - see comment above
 }
@@ -733,6 +790,35 @@ func Test_FindByShortCodeEndpoint(t *testing.T) {
 				tt.assertions(t, w)
 			}
 		})
+	}
+}
+
+func Test_FindByShortCodeUsesValkeyCache(t *testing.T) {
+	cleanupDatabase(t)
+
+	authResponse, err := registerUserHelper("cache@example.com", "password123")
+	if err != nil {
+		t.Fatalf("registerUserHelper() error = %v", err)
+	}
+	urlResponse, err := createShortenURLHelper("https://cached.example/path", authResponse.Tokens.AccessToken)
+	if err != nil {
+		t.Fatalf("createShortenURLHelper() error = %v", err)
+	}
+
+	if err := testDB.Delete(&domain.URL{}, "id = ?", urlResponse.ID).Error; err != nil {
+		t.Fatalf("delete URL directly from database: %v", err)
+	}
+
+	response := makeRequest(http.MethodGet, "/api/v1/urls/short/"+urlResponse.ShortCode, nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("cached lookup status = %d, want %d; body = %s", response.Code, http.StatusOK, response.Body.String())
+	}
+	var cachedURL domain.URL
+	if err := json.Unmarshal(response.Body.Bytes(), &cachedURL); err != nil {
+		t.Fatalf("decode cached URL: %v", err)
+	}
+	if cachedURL.OriginalURL != "https://cached.example/path" {
+		t.Errorf("cached OriginalURL = %q, want %q", cachedURL.OriginalURL, "https://cached.example/path")
 	}
 }
 

@@ -44,7 +44,7 @@ func provideHandler() (*Handler, error) {
 	}
 
 	urlRepository := url.NewMockRepository()
-	svc := urlSvc.NewService(urlRepository, counterSvcInstance)
+	svc := urlSvc.NewService(urlRepository, nil, counterSvcInstance)
 	return NewHandler(svc), nil
 }
 

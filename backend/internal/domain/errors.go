@@ -17,6 +17,8 @@ var (
 
 	ErrUrlStatisticsNotFound = errors.New("url statistics not found")
 
+	ErrCacheMiss = errors.New("cache miss")
+
 	// Range allocation errors
 	ErrRangeAllocFailed = errors.New("failed to allocate range")
 	ErrRangeNotFound    = errors.New("range not found")

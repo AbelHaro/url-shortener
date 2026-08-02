@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 
 	"github.com/AbelHaro/url-shortener/backend/internal/domain"
@@ -14,12 +15,16 @@ import (
 
 type Service struct {
 	repo           urlRepo.Repository
+	cache          urlRepo.Cache
 	counterService *counter.Service
 }
 
-func NewService(repo urlRepo.Repository, counterService *counter.Service) *Service {
+// NewService creates a URL service. A nil cache disables caching while keeping
+// PostgreSQL as the source of truth.
+func NewService(repo urlRepo.Repository, cache urlRepo.Cache, counterService *counter.Service) *Service {
 	return &Service{
 		repo:           repo,
+		cache:          cache,
 		counterService: counterService,
 	}
 }
@@ -44,20 +49,37 @@ func (svc *Service) Store(originalURL string, ownerID uuid.UUID) (*domain.URL, e
 	}
 
 	urlInserted, err := svc.repo.Store(urlToInsert)
-
 	if err != nil {
 		return nil, domain.ErrInternal
 	}
+
+	svc.cacheURL(context.Background(), urlInserted, false)
 	return urlInserted, nil
 }
 
 func (svc *Service) FindByShortCode(shortCode string) (*domain.URL, error) {
+	ctx := context.Background()
+	populateCache := svc.cache != nil
+	if svc.cache != nil {
+		urlFromCache, err := svc.cache.GetByShortCode(ctx, shortCode)
+		if err == nil {
+			return urlFromCache, nil
+		}
+		if !errors.Is(err, domain.ErrCacheMiss) {
+			slog.WarnContext(ctx, "failed to retrieve URL from cache", "short_code", shortCode, "error", err)
+			populateCache = false
+		}
+	}
+
 	urlFound, err := svc.repo.FindByShortCode(shortCode)
 	if err != nil {
 		return nil, err
 	}
 	if urlFound == nil {
 		return nil, domain.ErrURLNotFound
+	}
+	if populateCache {
+		svc.cacheURL(ctx, urlFound, false)
 	}
 	return urlFound, nil
 }
@@ -67,6 +89,7 @@ func (svc *Service) FindByID(id string) (*domain.URL, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse URL ID: %w", domain.ErrInvalidID)
 	}
+
 	urlFound, err := svc.repo.FindByID(parsedID)
 	if err != nil {
 		return nil, err
@@ -74,6 +97,7 @@ func (svc *Service) FindByID(id string) (*domain.URL, error) {
 	if urlFound == nil {
 		return nil, domain.ErrURLNotFound
 	}
+
 	return urlFound, nil
 }
 
@@ -109,6 +133,7 @@ func (svc *Service) UpdateOriginalURLForUser(ctx context.Context, id string, use
 		}
 		return nil, fmt.Errorf("update URL for user: %w", domain.ErrInternal)
 	}
+	svc.cacheURL(ctx, updatedURL, true)
 	return updatedURL, nil
 }
 
@@ -128,18 +153,21 @@ func (svc *Service) DeleteByID(id string) error {
 	if err != nil {
 		return fmt.Errorf("parse URL ID: %w", domain.ErrInvalidID)
 	}
-	_, err = svc.repo.FindByID(parsedID)
+
+	urlFound, err := svc.repo.FindByID(parsedID)
 	if err != nil {
 		return domain.ErrURLNotFound
 	}
 
-	err = svc.repo.DeleteByID(uuid.MustParse(id))
+	err = svc.repo.DeleteByID(parsedID)
 	if errors.Is(err, domain.ErrURLNotFound) {
 		return err
 	}
 	if err != nil {
 		return domain.ErrInternal
 	}
+
+	svc.invalidateCache(context.Background(), urlFound.ShortCode)
 	return nil
 }
 
@@ -149,17 +177,27 @@ func (svc *Service) DeleteByIDForUser(ctx context.Context, id string, userID uui
 	if err != nil {
 		return fmt.Errorf("parse URL ID: %w", domain.ErrInvalidID)
 	}
+
+	urlFound, err := svc.repo.FindByIDAndUserID(ctx, parsedID, userID)
+	if err != nil {
+		return fmt.Errorf("find URL for user: %w", err)
+	}
+	if urlFound == nil {
+		return domain.ErrURLNotFound
+	}
+
 	if err := svc.repo.DeleteByIDAndUserID(ctx, parsedID, userID); err != nil {
 		if errors.Is(err, domain.ErrURLNotFound) {
 			return err
 		}
 		return fmt.Errorf("delete URL for user: %w", domain.ErrInternal)
 	}
+	svc.invalidateCache(ctx, urlFound.ShortCode)
 	return nil
 }
 
 func (svc *Service) DeleteByOriginalURL(originalURL string) error {
-	_, err := svc.repo.FindByOriginalURL(originalURL)
+	urlFound, err := svc.repo.FindByOriginalURL(originalURL)
 	if err != nil {
 		return domain.ErrURLNotFound
 	}
@@ -168,20 +206,45 @@ func (svc *Service) DeleteByOriginalURL(originalURL string) error {
 	if err != nil {
 		return domain.ErrInternal
 	}
+	svc.invalidateCache(context.Background(), urlFound.ShortCode)
 	return nil
 }
 
 func (svc *Service) DeleteByShortCode(shortCode string) error {
-	_, err := svc.repo.FindByShortCode(shortCode)
-	if err != nil {
-		return domain.ErrURLNotFound
+	err := svc.repo.DeleteByShortCode(shortCode)
+	if errors.Is(err, domain.ErrURLNotFound) {
+		return err
 	}
-
-	err = svc.repo.DeleteByShortCode(shortCode)
 	if err != nil {
 		return domain.ErrInternal
 	}
+	svc.invalidateCache(context.Background(), shortCode)
 	return nil
+}
+
+// cacheURL refreshes the cache after a successful database read or write.
+// Updates invalidate the previous value when SET fails to avoid stale redirects.
+func (svc *Service) cacheURL(ctx context.Context, storedURL *domain.URL, invalidateOnFailure bool) {
+	if svc.cache == nil || storedURL == nil {
+		return
+	}
+	if err := svc.cache.SetByShortCode(ctx, storedURL.ShortCode, storedURL); err != nil {
+		slog.WarnContext(ctx, "failed to cache URL", "short_code", storedURL.ShortCode, "error", err)
+		if invalidateOnFailure {
+			svc.invalidateCache(ctx, storedURL.ShortCode)
+		}
+	}
+}
+
+// invalidateCache removes a URL from the cache without turning an already
+// successful database mutation into an API error.
+func (svc *Service) invalidateCache(ctx context.Context, shortCode string) {
+	if svc.cache == nil {
+		return
+	}
+	if err := svc.cache.DeleteByShortCode(ctx, shortCode); err != nil {
+		slog.WarnContext(ctx, "failed to invalidate cached URL", "short_code", shortCode, "error", err)
+	}
 }
 
 func (svc *Service) ValidateURL(rawURL string) error {

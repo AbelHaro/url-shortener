@@ -100,7 +100,7 @@ func SetupRoutes(r *gin.Engine, urlHandler *url.Handler, statisticsHandler *stat
 
 // NewConfiguredRouter creates and configures a Gin router with all handlers, middleware, and services
 // initialized using the provided database connection and JWT configuration
-func NewConfiguredRouter(db *gorm.DB, appConfig *config.AppConfig) (*gin.Engine, error) {
+func NewConfiguredRouter(db *gorm.DB, urlCache urlRepo.Cache, appConfig *config.AppConfig) (*gin.Engine, error) {
 	router := gin.Default()
 
 	// Initialize repositories
@@ -117,7 +117,7 @@ func NewConfiguredRouter(db *gorm.DB, appConfig *config.AppConfig) (*gin.Engine,
 		return nil, fmt.Errorf("failed to initialize counter service: %w", err)
 	}
 
-	urlService := urlSvc.NewService(urlRepoInstance, counterService)
+	urlService := urlSvc.NewService(urlRepoInstance, urlCache, counterService)
 	statisticService := statisticSvc.NewService(statisticRepoInstance)
 	jwtService := jwtSvc.NewService(appConfig.JWTSecret, appConfig.AccessTTL, appConfig.RefreshTTL)
 	authService := authSvc.NewService(authRepoInstance, jwtService)

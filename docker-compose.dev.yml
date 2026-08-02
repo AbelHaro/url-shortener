@@ -11,6 +11,11 @@ services:
     ports:
       - "5432:5432"
     restart: unless-stopped
+  cache:
+    image: valkey/valkey:9.1.1
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
 
 volumes:
   postgres_data:
